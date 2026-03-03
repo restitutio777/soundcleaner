@@ -73,72 +73,64 @@ export default function ProcessingModal({
     <div className="modal-backdrop animate-scale-in">
       <div
         className="modal"
-        style={{
-          width: "500px",
-          padding: "40px",
-        }}
+        style={{ width: "460px", padding: "36px" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-col items-center" style={{ gap: "28px" }}>
-          {/* Animated Icon */}
+        <div className="flex flex-col" style={{ gap: "28px" }}>
+          {/* Icon */}
           <div
             className="flex items-center justify-center"
             style={{
-              width: "88px",
-              height: "88px",
+              width: "56px",
+              height: "56px",
               background:
                 progress >= 100
-                  ? "rgba(52, 211, 153, 0.12)"
-                  : "rgba(139, 92, 246, 0.12)",
-              borderRadius: "50%",
-              border: `2px solid ${progress >= 100 ? "rgba(52, 211, 153, 0.3)" : "rgba(139, 92, 246, 0.25)"}`,
-              transition: "all 0.5s",
+                  ? "var(--color-success-bg)"
+                  : "var(--color-accent-muted)",
+              borderRadius: "3px",
+              transition: "background-color 0.3s",
             }}
           >
             {progress >= 100 ? (
-              <CheckCircle size={42} color="#34d399" />
+              <CheckCircle size={28} color="var(--color-success)" />
             ) : (
               <Loader2
-                size={42}
-                color="#a78bfa"
+                size={28}
+                color="var(--color-accent)"
                 className="animate-spin"
               />
             )}
           </div>
 
           {/* Title */}
-          <div
-            className="flex flex-col items-center"
-            style={{ gap: "8px" }}
-          >
+          <div className="flex flex-col" style={{ gap: "6px" }}>
             <h3
               style={{
                 margin: 0,
-                fontSize: "24px",
-                fontWeight: 800,
-                color: "#f4f4f5",
-                letterSpacing: "-0.02em",
+                fontFamily: "var(--font-display)",
+                fontSize: "22px",
+                fontWeight: 400,
+                color: "var(--color-foreground)",
               }}
             >
               {progress >= 100
-                ? "Verarbeitung abgeschlossen!"
+                ? "Verarbeitung abgeschlossen"
                 : "Audio wird verarbeitet"}
             </h3>
             <p
               style={{
                 margin: 0,
                 fontSize: "14px",
-                color: "#71717a",
-                textAlign: "center",
+                color: "var(--color-foreground-subtle)",
               }}
             >
               {progress >= 100
-                ? "Dein Audio wurde erfolgreich bereinigt"
-                : "Das kann einen Moment dauern..."}
+                ? "Dein Audio wurde erfolgreich bereinigt."
+                : "Das kann einen Moment dauern\u2026"}
             </p>
           </div>
 
-          {/* Progress Bar */}
+          {/* Progress */}
           <div style={{ width: "100%" }}>
             <div className="progress-bar">
               <div
@@ -148,14 +140,24 @@ export default function ProcessingModal({
             </div>
             <div
               className="flex items-center justify-between"
-              style={{ marginTop: "10px" }}
+              style={{ marginTop: "8px" }}
             >
-              <span style={{ fontSize: "13px", color: "#71717a" }}>
+              <span
+                style={{
+                  fontSize: "12px",
+                  color: "var(--color-foreground-subtle)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
                 Fortschritt
               </span>
               <span
-                className="gradient-text"
-                style={{ fontSize: "13px", fontWeight: 700 }}
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "var(--color-accent)",
+                }}
               >
                 {progress}%
               </span>
@@ -167,51 +169,51 @@ export default function ProcessingModal({
             className="flex flex-col"
             style={{
               width: "100%",
-              gap: "10px",
-              padding: "16px 20px",
-              background: "rgba(15, 15, 20, 0.4)",
-              borderRadius: "14px",
-              border: "1px solid rgba(63, 63, 80, 0.3)",
+              gap: "8px",
+              padding: "14px 16px",
+              background: "var(--color-surface)",
+              borderRadius: "3px",
+              border: "1px solid var(--color-border)",
             }}
           >
             {steps.map((step, index) => (
               <div
                 key={index}
                 className="flex items-center"
-                style={{ gap: "12px" }}
+                style={{ gap: "10px" }}
               >
                 <div
                   style={{
-                    width: "22px",
-                    height: "22px",
-                    borderRadius: "50%",
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "2px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    flexShrink: 0,
                     background:
                       step.status === "complete"
-                        ? "linear-gradient(135deg, #8b5cf6, #c084fc)"
+                        ? "var(--color-accent)"
                         : step.status === "processing"
-                          ? "rgba(139, 92, 246, 0.2)"
-                          : "rgba(63, 63, 80, 0.3)",
+                          ? "var(--color-accent-muted)"
+                          : "var(--color-indigo-muted)",
                     border:
                       step.status === "processing"
-                        ? "2px solid #8b5cf6"
-                        : "none",
-                    transition: "all 0.3s",
-                    flexShrink: 0,
+                        ? "1px solid var(--color-accent)"
+                        : "1px solid transparent",
+                    transition: "all 0.2s",
                   }}
                 >
                   {step.status === "complete" && (
-                    <CheckCircle size={13} color="#fff" />
+                    <CheckCircle size={11} color="#fff" />
                   )}
                   {step.status === "processing" && (
                     <div
                       style={{
-                        width: "8px",
-                        height: "8px",
-                        borderRadius: "50%",
-                        background: "#a78bfa",
+                        width: "6px",
+                        height: "6px",
+                        borderRadius: "1px",
+                        background: "var(--color-accent)",
                       }}
                       className="animate-pulse"
                     />
@@ -219,12 +221,13 @@ export default function ProcessingModal({
                 </div>
                 <span
                   style={{
-                    fontSize: "14px",
+                    fontSize: "13px",
                     color:
-                      step.status === "pending" ? "#52525b" : "#e4e4e7",
-                    fontWeight:
-                      step.status === "processing" ? 600 : 400,
-                    transition: "all 0.3s",
+                      step.status === "pending"
+                        ? "var(--color-foreground-subtle)"
+                        : "var(--color-foreground)",
+                    fontWeight: step.status === "processing" ? 600 : 400,
+                    transition: "color 0.2s",
                   }}
                 >
                   {step.label}

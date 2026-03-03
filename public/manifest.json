@@ -1,0 +1,21 @@
+{
+  "name": "KlangRein — KI Audio-Verbesserung",
+  "short_name": "KlangRein",
+  "description": "KI-gesteuerte Audio-Verbesserung. Entferne Rauschen und Füllwörter.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D0D0D",
+  "theme_color": "#BF6F84",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["utilities", "productivity"],
+  "lang": "de",
+  "dir": "ltr"
+}

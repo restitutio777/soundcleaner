@@ -34,17 +34,14 @@ export default function Toast({
       className={`toast ${
         type === "success" ? "toast-success" : "toast-error"
       } animate-slide-up`}
-      style={{
-        padding: "14px 18px",
-        gap: "12px",
-      }}
+      style={{ padding: "12px 16px", gap: "10px" }}
     >
       {type === "success" ? (
-        <CheckCircle size={20} />
+        <CheckCircle size={16} />
       ) : (
-        <AlertCircle size={20} />
+        <AlertCircle size={16} />
       )}
-      <span style={{ fontSize: "14px", fontWeight: 600 }}>{message}</span>
+      <span style={{ fontSize: "13px", fontWeight: 600 }}>{message}</span>
       <button
         onClick={onClose}
         style={{
@@ -55,14 +52,11 @@ export default function Toast({
           display: "flex",
           alignItems: "center",
           color: "inherit",
-          marginLeft: "8px",
-          opacity: 0.7,
-          transition: "opacity 0.2s",
+          marginLeft: "4px",
+          opacity: 0.6,
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
       >
-        <X size={16} />
+        <X size={14} />
       </button>
     </div>
   );
