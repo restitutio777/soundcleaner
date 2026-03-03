@@ -66,6 +66,19 @@ body::after {
   background-size: 256px 256px;
 }
 
+/* Artistic soundwave background */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='wg' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0%25' stop-color='%234C4E73' stop-opacity='0'/%3E%3Cstop offset='20%25' stop-color='%234C4E73' stop-opacity='1'/%3E%3Cstop offset='50%25' stop-color='%23BF6F84' stop-opacity='1'/%3E%3Cstop offset='80%25' stop-color='%234C4E73' stop-opacity='1'/%3E%3Cstop offset='100%25' stop-color='%234C4E73' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='wg2' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0%25' stop-color='%23BF6F84' stop-opacity='0'/%3E%3Cstop offset='35%25' stop-color='%23BF6F84' stop-opacity='1'/%3E%3Cstop offset='65%25' stop-color='%23F294C0' stop-opacity='1'/%3E%3Cstop offset='100%25' stop-color='%23BF6F84' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3C!-- Core waveform cluster --%3E%3Cpath d='M0 450 Q80 430 160 450 T320 440 T480 455 T640 442 T800 452 T960 445 T1120 453 T1280 447 T1440 450' fill='none' stroke='url(%23wg2)' stroke-width='1.5' opacity='0.18'/%3E%3Cpath d='M0 450 Q120 410 240 450 T480 420 T720 460 T960 415 T1200 455 T1440 435' fill='none' stroke='url(%23wg)' stroke-width='1.2' opacity='0.22'/%3E%3Cpath d='M0 450 Q100 475 200 450 T400 485 T600 425 T800 475 T1000 435 T1200 470 T1440 450' fill='none' stroke='url(%23wg)' stroke-width='1' opacity='0.2'/%3E%3Cpath d='M0 450 Q160 370 320 450 T640 380 T960 465 T1280 390 T1440 450' fill='none' stroke='url(%23wg2)' stroke-width='0.8' opacity='0.14'/%3E%3Cpath d='M0 450 Q200 340 400 450 T800 320 T1200 460 T1440 370' fill='none' stroke='url(%23wg)' stroke-width='0.6' opacity='0.1'/%3E%3C!-- Outer echo waves --%3E%3Cpath d='M0 450 Q240 290 480 450 T960 270 T1440 450' fill='none' stroke='url(%23wg)' stroke-width='0.4' opacity='0.06'/%3E%3Cpath d='M0 450 Q240 610 480 450 T960 630 T1440 450' fill='none' stroke='url(%23wg)' stroke-width='0.4' opacity='0.06'/%3E%3Cpath d='M0 450 Q140 400 280 450 T560 410 T840 460 T1120 415 T1440 450' fill='none' stroke='url(%23wg2)' stroke-width='0.9' opacity='0.16'/%3E%3Cpath d='M0 450 Q140 500 280 450 T560 490 T840 440 T1120 485 T1440 450' fill='none' stroke='url(%23wg2)' stroke-width='0.9' opacity='0.16'/%3E%3C/svg%3E");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 /* ====== CARDS ====== */
 .card {
   background: var(--color-elevated);

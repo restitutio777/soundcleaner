@@ -13,7 +13,6 @@ import {
   MessageSquare,
   Volume,
   Check,
-  AudioLines,
 } from "lucide-react";
 import AudioPlayer from "./components/AudioPlayer";
 import ProcessingModal from "./components/ProcessingModal";
@@ -162,24 +161,13 @@ export default function Home() {
         }}
       >
         {/* Brand */}
-        <div className="flex items-center animate-fade-in" style={{ gap: "14px" }}>
-          <div
-            className="flex items-center justify-center"
-            style={{
-              width: "40px",
-              height: "40px",
-              background: "var(--color-accent)",
-              borderRadius: "3px",
-            }}
-          >
-            <AudioLines size={22} color="#fff" />
-          </div>
+        <div className="flex justify-center animate-fade-in">
           <span
             style={{
               fontFamily: "var(--font-display)",
-              fontSize: "24px",
+              fontSize: "28px",
               color: "var(--color-ice)",
-              letterSpacing: "-0.01em",
+              letterSpacing: "0.04em",
             }}
           >
             KlangRein
