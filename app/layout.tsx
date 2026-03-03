@@ -9,8 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AudioClean - AI-Powered Audio Enhancement",
-  description: "Remove background noise, vocal fillers, and enhance your audio quality instantly",
+  title: "KlangRein - KI-gesteuerte Audio-Verbesserung",
+  description:
+    "Entferne Hintergrundgeräusche, Füllwörter und verbessere deine Audioqualität sofort mit KI.",
 };
 
 export default function RootLayout({
@@ -19,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="de">
       <body className={inter.variable}>{children}</body>
     </html>
   );

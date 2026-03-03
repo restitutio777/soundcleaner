@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Volume2, Download } from "lucide-react";
+import { Play, Pause, Volume2, Download, AudioLines } from "lucide-react";
 
 interface AudioPlayerProps {
   file: File | null;
@@ -80,38 +80,48 @@ export default function AudioPlayer({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Generate fake waveform bars
-  const waveformBars = Array.from({ length: 100 }, (_, i) => {
+  const waveformBars = Array.from({ length: 80 }, (_, i) => {
     const height = Math.sin(i * 0.15) * 30 + 40 + Math.random() * 20;
     const progress = (currentTime / duration) * 100;
-    const isActive = (i / 100) * 100 < progress;
+    const isActive = (i / 80) * 100 < progress;
     return { height, isActive };
   });
 
   if (!file) return null;
 
   return (
-    <div className="card" style={{ padding: "28px", width: "100%" }}>
+    <div
+      className="glass glass-glow"
+      style={{ padding: "28px", width: "100%" }}
+    >
       <audio ref={audioRef} src={audioUrl} />
 
-      <div className="flex items-center justify-between" style={{ marginBottom: "24px" }}>
+      <div
+        className="flex items-center justify-between"
+        style={{ marginBottom: "24px" }}
+      >
         <div className="flex items-center" style={{ gap: "14px" }}>
           <div
-            className="flex items-center justify-center"
+            className="icon-box icon-box-accent"
             style={{
               width: "52px",
               height: "52px",
-              background: "rgba(6, 214, 160, 0.1)",
-              borderRadius: "12px",
             }}
           >
-            <Volume2 size={26} color="#06d6a0" />
+            <AudioLines size={26} />
           </div>
           <div className="flex flex-col" style={{ gap: "4px" }}>
-            <h4 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#e6edf3" }}>
+            <h4
+              style={{
+                margin: 0,
+                fontSize: "16px",
+                fontWeight: 700,
+                color: "#f4f4f5",
+              }}
+            >
               {file.name}
             </h4>
-            <p style={{ margin: 0, fontSize: "13px", color: "#8b949e" }}>
+            <p style={{ margin: 0, fontSize: "13px", color: "#71717a" }}>
               {(file.size / (1024 * 1024)).toFixed(2)} MB
             </p>
           </div>
@@ -120,11 +130,15 @@ export default function AudioPlayer({
         {isProcessed && onDownload && (
           <button
             className="btn btn-primary flex items-center"
-            style={{ padding: "12px 24px", gap: "8px" }}
+            style={{
+              padding: "12px 24px",
+              gap: "8px",
+              borderRadius: "12px",
+            }}
             onClick={onDownload}
           >
             <Download size={18} />
-            Download
+            Herunterladen
           </button>
         )}
       </div>
@@ -138,7 +152,10 @@ export default function AudioPlayer({
           padding: "20px 16px",
         }}
       >
-        <div className="flex items-center justify-center" style={{ height: "100%", gap: "3px" }}>
+        <div
+          className="flex items-center justify-center"
+          style={{ height: "100%", gap: "3px" }}
+        >
           {waveformBars.map((bar, i) => (
             <div
               key={i}
@@ -146,7 +163,7 @@ export default function AudioPlayer({
               style={{
                 width: "100%",
                 height: `${bar.height}%`,
-                opacity: bar.isActive ? 1 : 0.25,
+                opacity: bar.isActive ? 1 : 0.2,
               }}
             />
           ))}
@@ -154,8 +171,18 @@ export default function AudioPlayer({
       </div>
 
       {/* Timeline */}
-      <div className="flex items-center" style={{ gap: "12px", marginBottom: "16px" }}>
-        <span style={{ fontSize: "13px", color: "#8b949e", minWidth: "40px" }}>
+      <div
+        className="flex items-center"
+        style={{ gap: "12px", marginBottom: "16px" }}
+      >
+        <span
+          style={{
+            fontSize: "13px",
+            color: "#71717a",
+            minWidth: "40px",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
           {formatTime(currentTime)}
         </span>
         <input
@@ -167,7 +194,14 @@ export default function AudioPlayer({
           className="slider"
           style={{ flex: 1 }}
         />
-        <span style={{ fontSize: "13px", color: "#8b949e", minWidth: "40px" }}>
+        <span
+          style={{
+            fontSize: "13px",
+            color: "#71717a",
+            minWidth: "40px",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
           {formatTime(duration)}
         </span>
       </div>
@@ -176,14 +210,26 @@ export default function AudioPlayer({
       <div className="flex items-center justify-between">
         <button
           className="btn btn-primary"
-          style={{ width: "52px", height: "52px", borderRadius: "12px" }}
+          style={{
+            width: "52px",
+            height: "52px",
+            borderRadius: "14px",
+            padding: 0,
+          }}
           onClick={togglePlay}
         >
-          {isPlaying ? <Pause size={22} /> : <Play size={22} style={{ marginLeft: "2px" }} />}
+          {isPlaying ? (
+            <Pause size={22} />
+          ) : (
+            <Play size={22} style={{ marginLeft: "2px" }} />
+          )}
         </button>
 
-        <div className="flex items-center" style={{ gap: "12px", flex: 1, maxWidth: "250px" }}>
-          <Volume2 size={20} color="#8b949e" />
+        <div
+          className="flex items-center"
+          style={{ gap: "12px", flex: 1, maxWidth: "250px" }}
+        >
+          <Volume2 size={20} color="#71717a" />
           <input
             type="range"
             min="0"
@@ -193,7 +239,15 @@ export default function AudioPlayer({
             className="slider"
             style={{ flex: 1 }}
           />
-          <span style={{ fontSize: "14px", color: "#8b949e", minWidth: "36px", fontWeight: 500 }}>
+          <span
+            style={{
+              fontSize: "14px",
+              color: "#71717a",
+              minWidth: "36px",
+              fontWeight: 600,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
             {volume}%
           </span>
         </div>
@@ -201,4 +255,3 @@ export default function AudioPlayer({
     </div>
   );
 }
-

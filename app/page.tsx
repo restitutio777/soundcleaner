@@ -1,14 +1,20 @@
 /**
- * AudioClean Demo
- * Theme: Ultra-minimalist dark with teal accents
- *
- * This is a demo mockup. Features are simulated for presentation purposes.
+ * KlangRein - KI-gesteuerte Audio-Verbesserung
+ * Theme: Premium dark with violet/purple glassmorphism
  */
 
 "use client";
 
 import { useState } from "react";
-import { Upload, Sparkles, Wind, MessageSquare, Volume, Check } from "lucide-react";
+import {
+  Upload,
+  Sparkles,
+  Wind,
+  MessageSquare,
+  Volume,
+  Check,
+  AudioLines,
+} from "lucide-react";
 import AudioPlayer from "./components/AudioPlayer";
 import ProcessingModal from "./components/ProcessingModal";
 import Toast from "./components/Toast";
@@ -39,22 +45,22 @@ export default function Home() {
   const [options, setOptions] = useState<CleaningOption[]>([
     {
       id: "noise",
-      label: "Background Noise",
-      description: "Remove ambient sounds, hum & static",
+      label: "Hintergrundgeräusche",
+      description: "Entfernt Umgebungsgeräusche, Brummen & Rauschen",
       icon: <Wind size={24} />,
       enabled: true,
     },
     {
       id: "fillers",
-      label: "Vocal Fillers",
-      description: "Remove 'uh', 'um', 'like' hesitations",
+      label: "Füllwörter",
+      description: "Entfernt 'äh', 'ähm', 'also' und Zögern",
       icon: <MessageSquare size={24} />,
       enabled: true,
     },
     {
       id: "enhance",
-      label: "Voice Enhancement",
-      description: "Boost clarity and vocal presence",
+      label: "Stimmverbesserung",
+      description: "Verbessert Klarheit & Stimmpräsenz",
       icon: <Volume size={24} />,
       enabled: true,
     },
@@ -90,14 +96,19 @@ export default function Home() {
 
   const toggleOption = (id: string) => {
     setOptions((prev) =>
-      prev.map((opt) => (opt.id === id ? { ...opt, enabled: !opt.enabled } : opt))
+      prev.map((opt) =>
+        opt.id === id ? { ...opt, enabled: !opt.enabled } : opt
+      )
     );
   };
 
   const handleProcess = () => {
     const enabledCount = options.filter((opt) => opt.enabled).length;
     if (enabledCount === 0) {
-      showToast("Please select at least one cleaning option", "error");
+      showToast(
+        "Bitte wähle mindestens eine Verbesserung aus",
+        "error"
+      );
       return;
     }
     setIsProcessing(true);
@@ -107,7 +118,7 @@ export default function Home() {
     setIsProcessing(false);
     if (originalFile) {
       setProcessedFile(originalFile);
-      showToast("Audio cleaned successfully!", "success");
+      showToast("Audio erfolgreich bereinigt!", "success");
     }
   };
 
@@ -116,12 +127,12 @@ export default function Home() {
       const url = URL.createObjectURL(processedFile);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `cleaned_${processedFile.name}`;
+      a.download = `bereinigt_${processedFile.name}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast("Audio downloaded!", "success");
+      showToast("Audio heruntergeladen!", "success");
     }
   };
 
@@ -137,311 +148,370 @@ export default function Home() {
 
   return (
     <div
-      className="flex flex-col items-center justify-center"
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(180deg, #0a0e14 0%, #14181f 100%)",
-        padding: "40px 24px",
+        position: "relative",
       }}
     >
-      {/* Header */}
-      <div className="flex items-center" style={{ gap: "12px", marginBottom: "48px" }}>
-        <div
-          className="flex items-center justify-center"
-          style={{
-            width: "40px",
-            height: "40px",
-            background: "linear-gradient(135deg, #06d6a0, #00b4d8)",
-            borderRadius: "10px",
-          }}
-        >
-          <Sparkles size={24} color="#0a0e14" />
-        </div>
-        <h1
-          style={{
-            fontSize: "28px",
-            fontWeight: 800,
-            background: "linear-gradient(135deg, #06d6a0, #00b4d8)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-            margin: 0,
-          }}
-        >
-          AudioClean
-        </h1>
+      {/* Animated Background */}
+      <div className="bg-mesh" />
+      <div className="particles">
+        <div className="particle" />
+        <div className="particle" />
+        <div className="particle" />
+        <div className="particle" />
+        <div className="particle" />
+        <div className="particle" />
+        <div className="particle" />
+        <div className="particle" />
       </div>
 
+      {/* Main Content */}
       <div
         className="flex flex-col items-center"
         style={{
-          maxWidth: "800px",
-          width: "100%",
-          gap: "32px",
+          position: "relative",
+          zIndex: 1,
+          padding: "48px 24px 80px",
+          minHeight: "100vh",
         }}
       >
-        {/* Hero Text */}
-        {!originalFile && (
-          <div className="flex flex-col items-center" style={{ gap: "16px", marginBottom: "24px" }}>
-            <h2
-              style={{
-                fontSize: "48px",
-                fontWeight: 800,
-                color: "#e6edf3",
-                margin: 0,
-                textAlign: "center",
-                lineHeight: "1.2",
-              }}
-            >
-              Clean Your Audio
-              <br />
-              <span
-                style={{
-                  background: "linear-gradient(135deg, #06d6a0, #00b4d8)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                In Seconds
-              </span>
-            </h2>
-            <p
-              style={{
-                fontSize: "18px",
-                color: "#8b949e",
-                margin: 0,
-                textAlign: "center",
-              }}
-            >
-              AI-powered audio enhancement. Remove noise, fillers, and boost clarity.
-            </p>
-          </div>
-        )}
-
-        {/* Upload Zone or Audio Player */}
-        {!originalFile ? (
-          <label
-            className={`upload-zone ${isDragging ? "drag-over" : ""}`}
+        {/* Logo / Brand */}
+        <div
+          className="flex items-center animate-fade-in"
+          style={{ gap: "14px", marginBottom: "56px" }}
+        >
+          <div
+            className="flex items-center justify-center animate-glow"
             style={{
-              width: "100%",
-              padding: "64px 32px",
-              cursor: "pointer",
+              width: "44px",
+              height: "44px",
+              background: "linear-gradient(135deg, #8b5cf6, #c084fc)",
+              borderRadius: "14px",
             }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
           >
-            <input
-              type="file"
-              accept="audio/*"
-              onChange={handleFileInput}
-              style={{ display: "none" }}
-            />
-            <div className="flex flex-col items-center" style={{ gap: "20px" }}>
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: "80px",
-                  height: "80px",
-                  background: "rgba(6, 214, 160, 0.1)",
-                  borderRadius: "16px",
-                }}
-              >
-                <Upload size={40} color="#06d6a0" />
-              </div>
-              <div className="flex flex-col items-center" style={{ gap: "8px" }}>
-                <p
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: 600,
-                    color: "#e6edf3",
-                    margin: 0,
-                  }}
-                >
-                  Drop your audio file here
-                </p>
-                <p style={{ fontSize: "15px", color: "#8b949e", margin: 0 }}>
-                  or click to browse • MP3, WAV, M4A, FLAC
-                </p>
-              </div>
-            </div>
-          </label>
-        ) : (
-          <div className="flex flex-col" style={{ width: "100%", gap: "24px" }}>
-            <AudioPlayer file={originalFile} />
+            <AudioLines size={24} color="#fff" />
           </div>
-        )}
+          <h1
+            className="gradient-text"
+            style={{
+              fontSize: "30px",
+              fontWeight: 800,
+              margin: 0,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            KlangRein
+          </h1>
+        </div>
 
-        {/* Cleaning Options */}
-        {originalFile && !processedFile && (
-          <>
-            <div className="flex flex-col" style={{ width: "100%", gap: "16px" }}>
-              <h3
+        <div
+          className="flex flex-col items-center"
+          style={{
+            maxWidth: "860px",
+            width: "100%",
+            gap: "36px",
+          }}
+        >
+          {/* Hero Text */}
+          {!originalFile && (
+            <div
+              className="flex flex-col items-center animate-slide-up"
+              style={{ gap: "18px", marginBottom: "28px" }}
+            >
+              <h2
                 style={{
-                  fontSize: "18px",
-                  fontWeight: 600,
-                  color: "#e6edf3",
+                  fontSize: "clamp(36px, 5vw, 56px)",
+                  fontWeight: 800,
+                  color: "#f4f4f5",
                   margin: 0,
                   textAlign: "center",
+                  lineHeight: "1.15",
+                  letterSpacing: "-0.03em",
                 }}
               >
-                Select Audio Enhancements
-              </h3>
-              <div
-                className="flex"
+                Dein Audio.
+                <br />
+                <span className="gradient-text">Kristallklar.</span>
+              </h2>
+              <p
                 style={{
-                  gap: "16px",
-                  width: "100%",
-                  justifyContent: "center",
-                  flexWrap: "wrap",
+                  fontSize: "18px",
+                  color: "#a1a1aa",
+                  margin: 0,
+                  textAlign: "center",
+                  maxWidth: "520px",
+                  lineHeight: "1.6",
                 }}
               >
-                {options.map((option) => (
-                  <button
-                    key={option.id}
-                    className={`card cursor-pointer transition-all ${
-                      option.enabled ? "" : ""
-                    }`}
-                    style={{
-                      flex: "1 1 220px",
-                      maxWidth: "250px",
-                      padding: "24px",
-                      border: option.enabled
-                        ? "2px solid #06d6a0"
-                        : "2px solid transparent",
-                      background: option.enabled
-                        ? "rgba(6, 214, 160, 0.08)"
-                        : "var(--color-card)",
-                    }}
-                    onClick={() => toggleOption(option.id)}
-                  >
-                    <div className="flex flex-col items-center" style={{ gap: "12px" }}>
-                      <div
-                        className="flex items-center justify-center"
-                        style={{
-                          width: "56px",
-                          height: "56px",
-                          background: option.enabled
-                            ? "rgba(6, 214, 160, 0.15)"
-                            : "rgba(139, 148, 158, 0.1)",
-                          borderRadius: "12px",
-                          color: option.enabled ? "#06d6a0" : "#8b949e",
-                          position: "relative",
-                        }}
-                      >
-                        {option.icon}
-                        {option.enabled && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: "-6px",
-                              right: "-6px",
-                              width: "24px",
-                              height: "24px",
-                              background: "#06d6a0",
-                              borderRadius: "50%",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Check size={14} color="#0a0e14" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-center" style={{ gap: "4px" }}>
-                        <h4
-                          style={{
-                            fontSize: "15px",
-                            fontWeight: 600,
-                            color: option.enabled ? "#e6edf3" : "#8b949e",
-                            margin: 0,
-                          }}
-                        >
-                          {option.label}
-                        </h4>
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#8b949e",
-                            margin: 0,
-                            textAlign: "center",
-                            lineHeight: "1.4",
-                          }}
-                        >
-                          {option.description}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                KI-gesteuerte Audio-Verbesserung. Entferne Rauschen, Füllwörter
+                und steigere die Klarheit deiner Aufnahmen.
+              </p>
             </div>
+          )}
 
-            <button
-              className="btn btn-primary flex items-center justify-center"
+          {/* Upload Zone or Audio Player */}
+          {!originalFile ? (
+            <label
+              className={`upload-zone ${isDragging ? "drag-over" : ""} animate-slide-up`}
               style={{
                 width: "100%",
-                maxWidth: "400px",
-                padding: "18px 32px",
-                fontSize: "16px",
-                fontWeight: 600,
-                gap: "12px",
+                padding: "72px 32px",
+                cursor: "pointer",
+                display: "block",
+                animationDelay: "0.1s",
+                animationFillMode: "both",
               }}
-              onClick={handleProcess}
-              disabled={isProcessing || enabledCount === 0}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
-              <Sparkles size={20} />
-              Clean Audio ({enabledCount} enhancement{enabledCount !== 1 ? "s" : ""})
-            </button>
-
-            <button
-              className="btn btn-ghost"
-              style={{ padding: "8px 16px", fontSize: "14px" }}
-              onClick={() => {
-                setOriginalFile(null);
-                setProcessedFile(null);
-              }}
-            >
-              Upload Different File
-            </button>
-          </>
-        )}
-
-        {/* Processed Audio */}
-        {processedFile && (
-          <div className="flex flex-col items-center" style={{ width: "100%", gap: "24px" }}>
+              <input
+                type="file"
+                accept="audio/*"
+                onChange={handleFileInput}
+                style={{ display: "none" }}
+              />
+              <div
+                className="flex flex-col items-center"
+                style={{ gap: "24px", position: "relative", zIndex: 1 }}
+              >
+                <div
+                  className="flex items-center justify-center animate-float"
+                  style={{
+                    width: "88px",
+                    height: "88px",
+                    background:
+                      "linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(192, 132, 252, 0.1))",
+                    borderRadius: "22px",
+                    border: "1px solid rgba(139, 92, 246, 0.2)",
+                  }}
+                >
+                  <Upload size={40} color="#a78bfa" />
+                </div>
+                <div
+                  className="flex flex-col items-center"
+                  style={{ gap: "10px" }}
+                >
+                  <p
+                    style={{
+                      fontSize: "20px",
+                      fontWeight: 700,
+                      color: "#f4f4f5",
+                      margin: 0,
+                    }}
+                  >
+                    Audio-Datei hierher ziehen
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "15px",
+                      color: "#71717a",
+                      margin: 0,
+                    }}
+                  >
+                    oder klicken zum Durchsuchen — MP3, WAV, M4A, FLAC
+                  </p>
+                </div>
+              </div>
+            </label>
+          ) : (
             <div
-              className="flex items-center"
-              style={{
-                gap: "12px",
-                padding: "12px 24px",
-                background: "rgba(6, 214, 160, 0.1)",
-                border: "1px solid rgba(6, 214, 160, 0.3)",
-                borderRadius: "12px",
-              }}
+              className="flex flex-col animate-scale-in"
+              style={{ width: "100%", gap: "24px" }}
             >
-              <Check size={20} color="#06d6a0" />
-              <span style={{ fontSize: "15px", fontWeight: 600, color: "#06d6a0" }}>
-                Audio Cleaned Successfully
-              </span>
+              <AudioPlayer file={originalFile} />
             </div>
+          )}
 
-            <AudioPlayer file={processedFile} isProcessed onDownload={handleDownload} />
+          {/* Cleaning Options */}
+          {originalFile && !processedFile && (
+            <>
+              <div
+                className="flex flex-col animate-slide-up"
+                style={{ width: "100%", gap: "20px" }}
+              >
+                <h3
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: 700,
+                    color: "#f4f4f5",
+                    margin: 0,
+                    textAlign: "center",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  Audio-Verbesserungen auswählen
+                </h3>
+                <div
+                  className="flex"
+                  style={{
+                    gap: "16px",
+                    width: "100%",
+                    justifyContent: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {options.map((option) => (
+                    <button
+                      key={option.id}
+                      className={`option-card ${option.enabled ? "active" : ""}`}
+                      style={{
+                        flex: "1 1 230px",
+                        maxWidth: "270px",
+                        textAlign: "center",
+                        border: option.enabled
+                          ? undefined
+                          : "2px solid rgba(63, 63, 80, 0.3)",
+                      }}
+                      onClick={() => toggleOption(option.id)}
+                    >
+                      <div
+                        className="flex flex-col items-center"
+                        style={{ gap: "14px", position: "relative", zIndex: 1 }}
+                      >
+                        <div
+                          className={`icon-box ${option.enabled ? "icon-box-accent" : "icon-box-muted"}`}
+                          style={{
+                            width: "56px",
+                            height: "56px",
+                            position: "relative",
+                          }}
+                        >
+                          {option.icon}
+                          {option.enabled && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "-6px",
+                                right: "-6px",
+                                width: "22px",
+                                height: "22px",
+                                background:
+                                  "linear-gradient(135deg, #8b5cf6, #c084fc)",
+                                borderRadius: "50%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                boxShadow: "0 2px 8px rgba(139, 92, 246, 0.4)",
+                              }}
+                            >
+                              <Check size={12} color="#fff" />
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          className="flex flex-col items-center"
+                          style={{ gap: "6px" }}
+                        >
+                          <h4
+                            style={{
+                              fontSize: "15px",
+                              fontWeight: 700,
+                              color: option.enabled ? "#f4f4f5" : "#71717a",
+                              margin: 0,
+                            }}
+                          >
+                            {option.label}
+                          </h4>
+                          <p
+                            style={{
+                              fontSize: "13px",
+                              color: "#71717a",
+                              margin: 0,
+                              textAlign: "center",
+                              lineHeight: "1.5",
+                            }}
+                          >
+                            {option.description}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            <button
-              className="btn btn-ghost"
-              style={{ padding: "8px 16px", fontSize: "14px" }}
-              onClick={() => {
-                setOriginalFile(null);
-                setProcessedFile(null);
-              }}
+              <button
+                className="btn btn-primary flex items-center justify-center"
+                style={{
+                  width: "100%",
+                  maxWidth: "420px",
+                  padding: "18px 36px",
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  gap: "12px",
+                  borderRadius: "16px",
+                }}
+                onClick={handleProcess}
+                disabled={isProcessing || enabledCount === 0}
+              >
+                <Sparkles size={20} />
+                Audio bereinigen ({enabledCount}{" "}
+                {enabledCount === 1 ? "Verbesserung" : "Verbesserungen"})
+              </button>
+
+              <button
+                className="btn btn-ghost"
+                style={{ padding: "10px 20px", fontSize: "14px" }}
+                onClick={() => {
+                  setOriginalFile(null);
+                  setProcessedFile(null);
+                }}
+              >
+                Andere Datei hochladen
+              </button>
+            </>
+          )}
+
+          {/* Processed Audio */}
+          {processedFile && (
+            <div
+              className="flex flex-col items-center animate-scale-in"
+              style={{ width: "100%", gap: "28px" }}
             >
-              Clean Another File
-            </button>
-          </div>
-        )}
+              <div
+                className="flex items-center"
+                style={{
+                  gap: "12px",
+                  padding: "14px 28px",
+                  background: "rgba(52, 211, 153, 0.08)",
+                  border: "1px solid rgba(52, 211, 153, 0.25)",
+                  borderRadius: "14px",
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                <Check size={20} color="#34d399" />
+                <span
+                  style={{
+                    fontSize: "15px",
+                    fontWeight: 700,
+                    color: "#34d399",
+                  }}
+                >
+                  Audio erfolgreich bereinigt
+                </span>
+              </div>
+
+              <AudioPlayer
+                file={processedFile}
+                isProcessed
+                onDownload={handleDownload}
+              />
+
+              <button
+                className="btn btn-ghost"
+                style={{ padding: "10px 20px", fontSize: "14px" }}
+                onClick={() => {
+                  setOriginalFile(null);
+                  setProcessedFile(null);
+                }}
+              >
+                Weitere Datei bereinigen
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <ProcessingModal isOpen={isProcessing} onComplete={handleProcessingComplete} />

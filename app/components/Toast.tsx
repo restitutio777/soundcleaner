@@ -23,7 +23,6 @@ export default function Toast({
       const timer = setTimeout(() => {
         onClose();
       }, duration);
-
       return () => clearTimeout(timer);
     }
   }, [isVisible, duration, onClose]);
@@ -36,7 +35,7 @@ export default function Toast({
         type === "success" ? "toast-success" : "toast-error"
       } animate-slide-up`}
       style={{
-        padding: "14px 16px",
+        padding: "14px 18px",
         gap: "12px",
       }}
     >
@@ -45,7 +44,7 @@ export default function Toast({
       ) : (
         <AlertCircle size={20} />
       )}
-      <span style={{ fontSize: "14px", fontWeight: 500 }}>{message}</span>
+      <span style={{ fontSize: "14px", fontWeight: 600 }}>{message}</span>
       <button
         onClick={onClose}
         style={{
@@ -57,11 +56,14 @@ export default function Toast({
           alignItems: "center",
           color: "inherit",
           marginLeft: "8px",
+          opacity: 0.7,
+          transition: "opacity 0.2s",
         }}
+        onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+        onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
       >
         <X size={16} />
       </button>
     </div>
   );
 }
-
