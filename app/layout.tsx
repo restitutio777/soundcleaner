@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Serif_Display, DM_Sans } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegistrar from "./components/ServiceWorkerRegistrar";
+import { AuthProvider } from "./context/AuthContext";
 
 const dmSerifDisplay = DM_Serif_Display({
   weight: "400",
@@ -43,7 +44,9 @@ export default function RootLayout({
         <meta name="theme-color" content="#BF6F84" />
       </head>
       <body className={`${dmSerifDisplay.variable} ${dmSans.variable}`}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <ServiceWorkerRegistrar />
       </body>
     </html>

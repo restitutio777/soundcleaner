@@ -4,13 +4,16 @@ import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, Download, AudioLines } from "lucide-react";
 
 interface AudioPlayerProps {
-  file: File | null;
+  // Erlaubt File (Original) oder Blob (verarbeitetes Audio)
+  file: File | Blob | null;
+  label?: string;
   isProcessed?: boolean;
   onDownload?: () => void;
 }
 
 export default function AudioPlayer({
   file,
+  label,
   isProcessed = false,
   onDownload,
 }: AudioPlayerProps) {
@@ -21,10 +24,13 @@ export default function AudioPlayer({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioUrl, setAudioUrl] = useState<string>("");
 
+  // URL für File oder Blob erzeugen und aufräumen
   useEffect(() => {
     if (file) {
       const url = URL.createObjectURL(file);
       setAudioUrl(url);
+      setCurrentTime(0);
+      setIsPlaying(false);
       return () => URL.revokeObjectURL(url);
     }
   }, [file]);
@@ -80,12 +86,17 @@ export default function AudioPlayer({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Wellenform aus Fortschritt rendern
   const waveformBars = Array.from({ length: 80 }, (_, i) => {
-    const height = Math.sin(i * 0.15) * 30 + 40 + Math.random() * 20;
-    const progress = (currentTime / duration) * 100;
+    const height = Math.sin(i * 0.15) * 30 + 40 + ((i * 17 + 7) % 20);
+    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
     const isActive = (i / 80) * 100 < progress;
     return { height, isActive };
   });
+
+  // Anzeigename bestimmen
+  const displayName = label ?? (file instanceof File ? file.name : "Verarbeitete Aufnahme");
+  const fileSize = file ? (file.size / (1024 * 1024)).toFixed(2) + " MB" : "";
 
   if (!file) return null;
 
@@ -99,7 +110,7 @@ export default function AudioPlayer({
       >
         <div className="flex items-center" style={{ gap: "12px" }}>
           <div
-            className="icon-box icon-box-accent"
+            className={`icon-box ${isProcessed ? "icon-box-accent" : "icon-box-muted"}`}
             style={{ width: "44px", height: "44px" }}
           >
             <AudioLines size={22} />
@@ -111,19 +122,25 @@ export default function AudioPlayer({
                 fontSize: "14px",
                 fontWeight: 600,
                 color: "var(--color-foreground)",
+                maxWidth: "300px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
-              {file.name}
+              {displayName}
             </h4>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "12px",
-                color: "var(--color-foreground-subtle)",
-              }}
-            >
-              {(file.size / (1024 * 1024)).toFixed(2)} MB
-            </p>
+            {fileSize && (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "12px",
+                  color: "var(--color-foreground-subtle)",
+                }}
+              >
+                {fileSize}
+              </p>
+            )}
           </div>
         </div>
 
@@ -139,7 +156,7 @@ export default function AudioPlayer({
         )}
       </div>
 
-      {/* Waveform */}
+      {/* Wellenform-Visualisierung */}
       <div
         className="waveform-container"
         style={{
@@ -202,7 +219,7 @@ export default function AudioPlayer({
         </span>
       </div>
 
-      {/* Controls */}
+      {/* Steuerung */}
       <div className="flex items-center justify-between">
         <button
           className="btn btn-primary"
