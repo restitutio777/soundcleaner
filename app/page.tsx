@@ -175,12 +175,19 @@ export default function Home() {
       }
 
       setProcessedBlob(resultBlob);
+      // Kurze Pause damit der Nutzer den "Fertig"-Status im Modal sieht
+      await new Promise((r) => setTimeout(r, 900));
       setIsProcessing(false);
       showToast("Audio erfolgreich bereinigt!", "success");
     } catch (err) {
       console.error("Verarbeitungsfehler:", err);
-      setProcessingError("Fehler bei der Verarbeitung. Bitte versuche es erneut.");
-      setIsProcessing(false);
+      // Modal für kurze Zeit mit Fehlermeldung anzeigen, dann schließen
+      setProcessingError("Audio konnte nicht verarbeitet werden.");
+      setTimeout(() => {
+        setIsProcessing(false);
+        setProcessingError(null);
+        showToast("Audio konnte nicht verarbeitet werden.", "error");
+      }, 2200);
     }
   };
 
