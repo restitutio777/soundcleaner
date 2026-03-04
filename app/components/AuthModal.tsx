@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Mail, Lock, Loader2 } from "lucide-react";
+import { X, Mail, Lock, Loader as Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 interface AuthModalProps {
