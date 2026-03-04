@@ -23,7 +23,7 @@ import CreditsPanel from "./components/CreditsPanel";
 import PresetSelector from "./components/PresetSelector";
 import { useAuth } from "./context/AuthContext";
 import { useCredits } from "./hooks/useCredits";
-import { processAudioBasic, processAudioPro, type ProcessingPreset } from "./lib/audioProcessor";
+import { processAudioBasic, processAudioPro, type ProcessingPreset, type ProcessingStats } from "./lib/audioProcessor";
 import { FREE_MAX_DURATION_SECONDS, PRO_MAX_DURATION_SECONDS } from "./lib/supabaseClient";
 
 export default function Home() {
@@ -40,6 +40,8 @@ export default function Home() {
   const [processingStep, setProcessingStep] = useState("");
   const [processingPercent, setProcessingPercent] = useState(0);
   const [processingError, setProcessingError] = useState<string | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [processingStats, setProcessingStats] = useState<ProcessingStats | null>(null);
 
   // UI-State
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -132,6 +134,10 @@ export default function Home() {
     setIsProcessing(true);
     setProcessingPercent(0);
     setProcessingStep("Wird vorbereitet");
+    setCompletedSteps([]);
+    setProcessingStats(null);
+
+    let lastStep = "";
 
     try {
       const duration = await getAudioDuration(originalFile);
@@ -148,30 +154,36 @@ export default function Home() {
         }
       }
 
+      // Fortschritts-Callback: abgeschlossene Schritte akkumulieren
+      const onProgress = ({ step, percent }: { step: string; percent: number }) => {
+        if (lastStep && lastStep !== step) {
+          setCompletedSteps((prev) => [...prev, lastStep]);
+        }
+        lastStep = step;
+        setProcessingStep(step);
+        setProcessingPercent(percent);
+      };
+
       let resultBlob: Blob;
 
       if (isPro) {
         // Phase 2: Pro-Verarbeitung mit erweitertem Preset
-        resultBlob = await processAudioPro(
-          originalFile,
-          selectedPreset,
-          ({ step, percent }) => {
-            setProcessingStep(step);
-            setProcessingPercent(percent);
-          }
-        );
+        const { blob, stats } = await processAudioPro(originalFile, selectedPreset, onProgress);
+        resultBlob = blob;
+        setProcessingStats(stats);
         // Credits nach erfolgreicher Verarbeitung abziehen
         await deductCredits(Math.ceil(duration));
         await logJob(originalFile.name, duration, selectedPreset);
       } else {
         // Phase 1: Basic Free-Verarbeitung
-        resultBlob = await processAudioBasic(
-          originalFile,
-          ({ step, percent }) => {
-            setProcessingStep(step);
-            setProcessingPercent(percent);
-          }
-        );
+        const { blob, stats } = await processAudioBasic(originalFile, onProgress);
+        resultBlob = blob;
+        setProcessingStats(stats);
+      }
+
+      // Letzten Schritt auch als abgeschlossen markieren
+      if (lastStep) {
+        setCompletedSteps((prev) => [...prev, lastStep]);
       }
 
       setProcessedBlob(resultBlob);
@@ -212,6 +224,8 @@ export default function Home() {
     setProcessingError(null);
     setProcessingPercent(0);
     setProcessingStep("");
+    setCompletedSteps([]);
+    setProcessingStats(null);
   };
 
   return (
@@ -543,6 +557,8 @@ export default function Home() {
         isOpen={isProcessing}
         currentStep={processingStep}
         percent={processingPercent}
+        completedSteps={completedSteps}
+        stats={processingStats}
         error={processingError}
       />
 
