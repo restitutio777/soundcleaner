@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader as Loader2, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from "lucide-react";
 
 interface ProcessingModalProps {
   isOpen: boolean;
