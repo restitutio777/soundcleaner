@@ -583,6 +583,193 @@ async function applyEQ(
   return result;
 }
 
+// ── Step 6 (basic): Dereverberation ──────────────────────────────────────────
+//
+// Spectral subtraction dereverberation (STFT-domain):
+//
+// The algorithm works frame-by-frame on overlapping windows. For each frame:
+//   1. Apply a Hann window and compute the magnitude spectrum via a real DFT.
+//   2. Maintain a running estimate of the reverb "floor" — the slowly-decaying
+//      tail energy left from previous frames — using an IIR smoother tuned to
+//      a ~120ms reverb decay time constant.
+//   3. Subtract a fraction (α) of the reverb floor from the current magnitude
+//      spectrum, clamping to a noise floor so we never subtract more than exists.
+//   4. Reconstruct the signal with overlap-add using the original phase (phase
+//      information is untouched so voice timbre is preserved).
+//
+// Parameters tuned for typical home/office rooms with ~80–200ms RT60:
+//   - Frame: 1024 samples (~23ms @ 44.1kHz)
+//   - Hop:   256 samples (75% overlap — smooth reconstruction)
+//   - Reverb IIR decay: τ = 0.12s
+//   - Subtraction strength α = 0.7 (moderate — avoids musical noise)
+//   - Floor β = 0.05 (prevents over-subtraction artifacts)
+//
+// No new AudioContext is created — operates directly on Float32Array samples.
+// Progress fires every YIELD_EVERY samples to keep the bar moving.
+
+async function applyDereverb(
+  buffer: AudioBuffer,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
+): Promise<AudioBuffer> {
+  onProgress({ step: "Hall reduzieren", percent: pctStart });
+
+  const sr    = buffer.sampleRate;
+  const nch   = buffer.numberOfChannels;
+  const N     = 1024;
+  const HOP   = 256;
+  const ALPHA = 0.70;
+  const BETA  = 0.05;
+
+  // IIR reverb-decay coefficient: τ = 120ms
+  const TAU_SAMPLES = sr * 0.12;
+  const decayCoeff  = Math.exp(-HOP / TAU_SAMPLES);
+
+  // Hann window
+  const hann = new Float32Array(N);
+  for (let i = 0; i < N; i++) hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)));
+
+  // Radix-2 Cooley–Tukey FFT (in-place, complex, N must be power of 2).
+  // fftRe / fftIm are reused across frames to avoid allocation.
+  const BINS  = N / 2 + 1;
+  const fftRe = new Float64Array(N);
+  const fftIm = new Float64Array(N);
+  const mag   = new Float32Array(BINS);
+
+  // Bit-reversal permutation table (computed once)
+  const bitRev = new Uint32Array(N);
+  {
+    const bits = Math.log2(N);
+    for (let i = 0; i < N; i++) {
+      let x = i, r = 0;
+      for (let b = 0; b < bits; b++) { r = (r << 1) | (x & 1); x >>= 1; }
+      bitRev[i] = r;
+    }
+  }
+
+  // Twiddle-factor cache (computed once)
+  const twRe = new Float64Array(N / 2);
+  const twIm = new Float64Array(N / 2);
+  for (let i = 0; i < N / 2; i++) {
+    const angle = (-2 * Math.PI * i) / N;
+    twRe[i] = Math.cos(angle);
+    twIm[i] = Math.sin(angle);
+  }
+
+  function fftInPlace(sign: 1 | -1): void {
+    // Bit-reverse shuffle
+    for (let i = 0; i < N; i++) {
+      const j = bitRev[i];
+      if (j > i) {
+        let t = fftRe[i]; fftRe[i] = fftRe[j]; fftRe[j] = t;
+        t = fftIm[i]; fftIm[i] = fftIm[j]; fftIm[j] = t;
+      }
+    }
+    // Butterfly stages
+    for (let len = 2; len <= N; len <<= 1) {
+      const half = len >> 1;
+      const step = N / len;
+      for (let i = 0; i < N; i += len) {
+        for (let j = 0; j < half; j++) {
+          const ti = step * j;
+          const wr = twRe[ti];
+          const wi = sign === 1 ? -twIm[ti] : twIm[ti];
+          const ur = fftRe[i + j],       ui = fftIm[i + j];
+          const vr = fftRe[i + j + half] * wr - fftIm[i + j + half] * wi;
+          const vi = fftRe[i + j + half] * wi + fftIm[i + j + half] * wr;
+          fftRe[i + j]        = ur + vr;
+          fftIm[i + j]        = ui + vi;
+          fftRe[i + j + half] = ur - vr;
+          fftIm[i + j + half] = ui - vi;
+        }
+      }
+    }
+  }
+
+  function doFFT(frame: Float32Array): void {
+    for (let i = 0; i < N; i++) { fftRe[i] = frame[i]; fftIm[i] = 0; }
+    fftInPlace(1);
+    for (let k = 0; k < BINS; k++) mag[k] = Math.sqrt(fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k]);
+  }
+
+  function doIFFT(outFrame: Float32Array): void {
+    fftInPlace(-1);
+    const invN = 1 / N;
+    for (let i = 0; i < N; i++) outFrame[i] = fftRe[i] * invN;
+  }
+
+  const pctRange = pctEnd - pctStart;
+  const out  = makeBuffer(nch, buffer.length, sr);
+
+  for (let ch = 0; ch < nch; ch++) {
+    const src     = buffer.getChannelData(ch);
+    const dst     = out.getChannelData(ch);
+    const ola     = new Float32Array(src.length + N);
+    const olaW    = new Float32Array(src.length + N);
+    const floor   = new Float32Array(BINS);
+    const frame   = new Float32Array(N);
+    const outFr   = new Float32Array(N);
+    let   worked  = 0;
+
+    for (let pos = 0; pos < src.length; pos += HOP) {
+      // Fill frame with Hann-windowed input
+      for (let i = 0; i < N; i++) {
+        const idx = pos + i;
+        frame[i] = idx < src.length ? src[idx] * hann[i] : 0;
+      }
+
+      // FFT
+      doFFT(frame);
+
+      // Update reverb floor IIR: floor ← decay * floor + (1-decay) * mag
+      // Subtract α * floor from magnitude, clamp to β * mag floor.
+      // Re-scale the complex FFT bins by the ratio (reduced/original mag)
+      // to preserve phase — voice timbre is unchanged.
+      for (let k = 0; k < BINS; k++) {
+        floor[k] = decayCoeff * floor[k] + (1 - decayCoeff) * mag[k];
+        const reduced = Math.max(mag[k] - ALPHA * floor[k], BETA * mag[k]);
+        const scale   = mag[k] > 1e-10 ? reduced / mag[k] : 0;
+        fftRe[k] *= scale;
+        fftIm[k] *= scale;
+        // Mirror for IFFT (real signal symmetry)
+        if (k > 0 && k < N - k) {
+          fftRe[N - k] = fftRe[k];
+          fftIm[N - k] = -fftIm[k];
+        }
+      }
+
+      // IFFT
+      doIFFT(outFr);
+
+      // Overlap-add with Hann synthesis window; accumulate window² for normalisation
+      for (let i = 0; i < N; i++) {
+        ola[pos + i]  += outFr[i] * hann[i];
+        olaW[pos + i] += hann[i] * hann[i];
+      }
+
+      worked += HOP;
+      if (worked % YIELD_EVERY < HOP) {
+        onProgress({
+          step: "Hall reduzieren",
+          percent: pctStart + Math.round(
+            Math.min((ch * src.length + pos) / (nch * src.length), 1) * pctRange
+          ),
+        });
+        await yieldToMain();
+      }
+    }
+
+    // Normalise OLA output by accumulated window energy per sample
+    for (let i = 0; i < src.length; i++) {
+      dst[i] = olaW[i] > 1e-8 ? ola[i] / olaW[i] : 0;
+    }
+  }
+
+  onProgress({ step: "Hall reduzieren", percent: pctEnd });
+  return out;
+}
+
 // ── WAV Export ────────────────────────────────────────────────────────────────
 
 function audioBufferToWav(
@@ -642,8 +829,9 @@ function audioBufferToWav(
 //   silence-det  10 → 28
 //   trim         28 → 48
 //   normalize    48 → 68
-//   compress     68 → 88
-//   encode       88 → 100
+//   compress     68 → 84
+//   dereverb     84 → 94
+//   encode       94 → 100
 //
 // Step % ranges (pro):
 //   decode        0 →  8
@@ -688,16 +876,18 @@ export async function processAudioBasic(
     cfg.compKneeDb,
     cfg.compMakeupDb,
     onProgress,
-    68, 88
+    68, 84
   );
 
-  const blob = audioBufferToWav(compressed, onProgress, 88, 100);
+  const dereverberated = await applyDereverb(compressed, onProgress, 84, 94);
+
+  const blob = audioBufferToWav(dereverberated, onProgress, 94, 100);
 
   return {
     blob,
     stats: {
       originalDuration,
-      processedDuration: compressed.duration,
+      processedDuration: dereverberated.duration,
       gainAppliedDb: gainDb,
       estimatedLufs,
       silenceRegionsFound: silenceRegions.length,
