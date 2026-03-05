@@ -6,6 +6,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { flushSync } from "react-dom";
 import {
   Upload,
   Sparkles,
@@ -154,14 +155,17 @@ export default function Home() {
         }
       }
 
-      // Fortschritts-Callback: abgeschlossene Schritte akkumulieren
+      // Fortschritts-Callback: flushSync forces React to render immediately
+      // so the progress bar updates live instead of batching all updates at end
       const onProgress = ({ step, percent }: { step: string; percent: number }) => {
-        if (lastStep && lastStep !== step) {
-          setCompletedSteps((prev) => [...prev, lastStep]);
-        }
-        lastStep = step;
-        setProcessingStep(step);
-        setProcessingPercent(percent);
+        flushSync(() => {
+          if (lastStep && lastStep !== step) {
+            setCompletedSteps((prev) => [...prev, lastStep]);
+          }
+          lastStep = step;
+          setProcessingStep(step);
+          setProcessingPercent(percent);
+        });
       };
 
       let resultBlob: Blob;

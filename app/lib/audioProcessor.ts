@@ -13,8 +13,6 @@
  * ✓ 3-min stereo 44.1kHz: ~7.9M iterations per step, yields every 88k → ~90 yields
  */
 
-"use client";
-
 export type ProcessingPreset = "basic" | "kursaufnahme" | "webinar" | "podcast";
 
 export interface ProcessingProgress {
