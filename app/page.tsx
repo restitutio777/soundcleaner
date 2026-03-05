@@ -139,6 +139,7 @@ export default function Home() {
     setProcessingStats(null);
 
     let lastStep = "";
+    let lastRenderedPercent = -1;
 
     try {
       const duration = await getAudioDuration(originalFile);
@@ -155,16 +156,21 @@ export default function Home() {
         }
       }
 
-      // Fortschritts-Callback: flushSync forces React to render immediately
-      // so the progress bar updates live instead of batching all updates at end
+      // Fortschritts-Callback: flushSync forces React to render immediately.
+      // Throttled to fire only when step label changes OR percent moves by ≥1
+      // to avoid hundreds of synchronous React re-renders inside tight loops.
       const onProgress = ({ step, percent }: { step: string; percent: number }) => {
+        const roundedPct = Math.round(percent);
+        const stepChanged = lastStep !== step;
+        if (!stepChanged && roundedPct === lastRenderedPercent) return;
         flushSync(() => {
-          if (lastStep && lastStep !== step) {
+          if (stepChanged && lastStep) {
             setCompletedSteps((prev) => [...prev, lastStep]);
           }
           lastStep = step;
+          lastRenderedPercent = roundedPct;
           setProcessingStep(step);
-          setProcessingPercent(percent);
+          setProcessingPercent(roundedPct);
         });
       };
 

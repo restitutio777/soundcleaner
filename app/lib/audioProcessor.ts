@@ -1,17 +1,18 @@
 /*
  * audioProcessor.ts — KlangRein
  *
- * Bug fixes vs previous version:
- * ✓ normalizeLufs: uses true RMS peak-search + correct dBFS gain, no more
- *   phantom attenuation from the broken LUFS formula clamping the signal to silence
- * ✓ applyCompression: threshold and env are now both in dBFS; gain reduction
- *   formula follows the textbook dB-domain soft-knee compressor correctly
- * ✓ detectSilenceRegions: backward pass now reads from smoothed[], not raw RMS
- *   (the old code was re-computing RMS from source and taking min, which destroyed
- *   detection for anything but hard cuts)
- * ✓ Single AudioContext per session, closed immediately after decode
- * ✓ AudioBuffer constructor (no OfflineAudioContext leak for makeBuffer)
- * ✓ yieldToMain() every ~88k samples to keep progress bar live
+ * Key design decisions:
+ * - onProgress fires at fixed % milestones AND inside every heavy loop so the
+ *   bar moves continuously for 3-min+ files instead of freezing between steps.
+ * - Step ranges:  decode 0→10, silence-detect 10→30, trim 30→50,
+ *                 normalize 50→70, compress 70→90, encode 90→100
+ * - One AudioContext created and closed per call to decodeAudio(); all buffer
+ *   allocation uses the AudioBuffer constructor (no extra context needed).
+ * - yieldToMain() every YIELD_EVERY samples to let React re-render progress.
+ * - Compressor operates in dBFS (correct textbook soft-knee formula).
+ * - Normalization uses true-peak clamp; cannot silence the file.
+ * - Silence detection: forward exponential smoothing, backward propagation
+ *   reads from smoothed[] (not raw RMS) to avoid destroying speech edges.
  */
 
 export type ProcessingPreset = "basic" | "kursaufnahme" | "webinar" | "podcast";
@@ -82,12 +83,18 @@ const PRESET_CONFIG: Record<ProcessingPreset, PresetConfig> = {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
+const YIELD_EVERY = 88200; // ~2s at 44.1kHz
+
 function yieldToMain(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function makeBuffer(numChannels: number, numSamples: number, sampleRate: number): AudioBuffer {
-  return new AudioBuffer({ numberOfChannels: numChannels, length: Math.max(1, numSamples), sampleRate });
+  return new AudioBuffer({
+    numberOfChannels: numChannels,
+    length: Math.max(1, numSamples),
+    sampleRate,
+  });
 }
 
 function calcRms(data: Float32Array, start: number, end: number): number {
@@ -98,7 +105,7 @@ function calcRms(data: Float32Array, start: number, end: number): number {
   return Math.sqrt(sum / count);
 }
 
-// True RMS loudness in dBFS — used only for stats display
+// RMS-based loudness in dBFS (used for stats display and normalization target)
 export function estimateLufs(buffer: AudioBuffer): number {
   let energy = 0;
   let count = 0;
@@ -113,35 +120,47 @@ export function estimateLufs(buffer: AudioBuffer): number {
 
 // ── Step 1: Decode ────────────────────────────────────────────────────────────
 
-async function decodeAudio(file: File): Promise<AudioBuffer> {
+async function decodeAudio(
+  file: File,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
+): Promise<AudioBuffer> {
+  onProgress({ step: "Audiodatei dekodieren", percent: pctStart });
+  await yieldToMain();
   const ctx = new AudioContext();
   try {
     const ab = await file.arrayBuffer();
-    return await ctx.decodeAudioData(ab);
+    const decoded = await ctx.decodeAudioData(ab);
+    onProgress({ step: "Audiodatei dekodieren", percent: pctEnd });
+    return decoded;
   } finally {
     await ctx.close();
   }
 }
 
 // ── Step 2: Silence detection ─────────────────────────────────────────────────
-// Uses a 20ms RMS window smoothed with a one-pole filter (forward pass only).
-// Backward pass now reads from the already-computed smoothed array — not from
-// raw source — to correctly detect pre-roll of non-silence regions.
 
 async function detectSilenceRegions(
   buffer: AudioBuffer,
   threshold: number,
-  minDuration: number
+  minDuration: number,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
 ): Promise<Array<{ start: number; end: number }>> {
   const data = buffer.getChannelData(0);
   const sr = buffer.sampleRate;
   const winSize = Math.max(1, Math.floor(sr * 0.02));
   const totalWins = Math.ceil(data.length / winSize);
-  const YIELD_EVERY = 2000;
+  const pctRange = pctEnd - pctStart;
+  const YIELD_WIN = 2000;
+
+  onProgress({ step: "Stille-Regionen erkennen", percent: pctStart });
 
   const smoothed = new Float32Array(totalWins);
 
-  // Forward: exponential smoothing of RMS
+  // Forward pass: exponential smoothing of RMS
   let prev = 0;
   for (let w = 0; w < totalWins; w++) {
     const s = w * winSize;
@@ -149,16 +168,27 @@ async function detectSilenceRegions(
     const rms = calcRms(data, s, e);
     prev = 0.8 * prev + 0.2 * rms;
     smoothed[w] = prev;
-    if (w % YIELD_EVERY === 0) await yieldToMain();
+    if (w % YIELD_WIN === 0) {
+      onProgress({
+        step: "Stille-Regionen erkennen",
+        percent: pctStart + Math.round((w / totalWins) * pctRange * 0.5),
+      });
+      await yieldToMain();
+    }
   }
 
-  // Backward: read smoothed[] (not raw RMS) to propagate loudness backwards
-  // This prevents pre-consonant transients being swallowed
+  // Backward pass: propagate loudness from smoothed[] to preserve speech edges
   let back = 0;
   for (let w = totalWins - 1; w >= 0; w--) {
     back = 0.8 * back + 0.2 * smoothed[w];
     smoothed[w] = Math.max(smoothed[w], back);
-    if (w % YIELD_EVERY === 0) await yieldToMain();
+    if (w % YIELD_WIN === 0) {
+      onProgress({
+        step: "Stille-Regionen erkennen",
+        percent: pctStart + Math.round((0.5 + (1 - w / totalWins) * 0.5) * pctRange),
+      });
+      await yieldToMain();
+    }
   }
 
   const regions: Array<{ start: number; end: number }> = [];
@@ -179,6 +209,7 @@ async function detectSilenceRegions(
     regions.push({ start: silStart, end: buffer.duration });
   }
 
+  onProgress({ step: "Stille-Regionen erkennen", percent: pctEnd });
   return regions;
 }
 
@@ -193,8 +224,13 @@ function crossfadeSamples(segA: number, segB: number, sr: number): number {
 async function trimSilenceRegions(
   buffer: AudioBuffer,
   regions: Array<{ start: number; end: number }>,
-  keepPause: number
+  keepPause: number,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
 ): Promise<AudioBuffer> {
+  onProgress({ step: "Stille kürzen – Übergänge glätten", percent: pctStart });
+
   const sr = buffer.sampleRate;
   const nch = buffer.numberOfChannels;
 
@@ -209,17 +245,18 @@ async function trimSilenceRegions(
   if (pos < buffer.duration) segments.push({ start: pos, end: buffer.duration });
 
   const segLens = segments.map((s) => Math.max(1, Math.floor((s.end - s.start) * sr)));
-  const total = segLens.reduce((a, b) => a + b, 0);
-  if (total <= 0) return buffer;
+  const totalSamples = segLens.reduce((a, b) => a + b, 0);
+  if (totalSamples <= 0) return buffer;
 
-  const out = makeBuffer(nch, total, sr);
-  const YIELD_EVERY = 88200;
+  const out = makeBuffer(nch, totalSamples, sr);
+  const totalWork = totalSamples * nch;
+  let worked = 0;
+  const pctRange = pctEnd - pctStart;
 
   for (let ch = 0; ch < nch; ch++) {
     const src = buffer.getChannelData(ch);
     const dst = out.getChannelData(ch);
     let dstOff = 0;
-    let processed = 0;
 
     for (let si = 0; si < segments.length; si++) {
       const len = segLens[si];
@@ -234,85 +271,107 @@ async function trimSilenceRegions(
         const fromEnd = len - 1 - s;
         if (fromEnd < fadeOut) samp *= Math.sqrt(fromEnd / fadeOut);
         dst[dstOff + s] = samp;
-        if (++processed >= YIELD_EVERY) { processed = 0; await yieldToMain(); }
+        if (++worked % YIELD_EVERY === 0) {
+          onProgress({
+            step: "Stille kürzen – Übergänge glätten",
+            percent: pctStart + Math.round((worked / totalWork) * pctRange),
+          });
+          await yieldToMain();
+        }
       }
       dstOff += len;
     }
   }
 
+  onProgress({ step: "Stille kürzen – Übergänge glätten", percent: pctEnd });
   return out;
 }
 
 // ── Step 4: Gain normalization ────────────────────────────────────────────────
-// Measures true peak across all channels, then applies a single gain so
-// the loudest peak reaches targetLufsDb worth of headroom.
-// This is simple, audibly correct, and cannot silence the file.
 
 async function normalizeLufs(
   buffer: AudioBuffer,
-  targetDb: number
+  targetDb: number,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
 ): Promise<{ buffer: AudioBuffer; gainDb: number }> {
-  const nch = buffer.numberOfChannels;
+  onProgress({ step: "Lautstärke normalisieren", percent: pctStart });
 
-  // Find true peak
+  const nch = buffer.numberOfChannels;
   let peak = 0;
+
   for (let ch = 0; ch < nch; ch++) {
     const d = buffer.getChannelData(ch);
     for (let i = 0; i < d.length; i++) {
       const a = Math.abs(d[i]);
       if (a > peak) peak = a;
+      if (i % YIELD_EVERY === 0) {
+        onProgress({
+          step: "Lautstärke normalisieren",
+          percent: pctStart + Math.round(((ch * d.length + i) / (nch * d.length)) * (pctEnd - pctStart) * 0.4),
+        });
+        await yieldToMain();
+      }
     }
-    await yieldToMain();
   }
 
   if (peak < 1e-6) return { buffer, gainDb: 0 };
 
-  // Current peak in dBFS
   const peakDb = 20 * Math.log10(peak);
-  // Target: bring peak to (targetDb + some headroom). We target -1 dBFS peak
-  // while also checking if the integrated level would be at targetDb.
-  // Simple and reliable: scale so the RMS level matches targetDb,
-  // but clamp so peak never exceeds -0.3 dBFS (= 0.966 linear).
   const currentRmsDb = estimateLufs(buffer);
   const gainDb = Math.min(targetDb - currentRmsDb, -0.3 - peakDb);
   const linearGain = Math.pow(10, gainDb / 20);
 
   const out = makeBuffer(nch, buffer.length, buffer.sampleRate);
-  const YIELD_EVERY = 88200;
+  const totalSamples = nch * buffer.length;
+  let written = 0;
+  const halfRange = (pctEnd - pctStart) * 0.6;
 
   for (let ch = 0; ch < nch; ch++) {
     const src = buffer.getChannelData(ch);
     const dst = out.getChannelData(ch);
     for (let i = 0; i < src.length; i++) {
       dst[i] = src[i] * linearGain;
-      if (i % YIELD_EVERY === 0) await yieldToMain();
+      if (++written % YIELD_EVERY === 0) {
+        onProgress({
+          step: "Lautstärke normalisieren",
+          percent: pctStart + Math.round((pctEnd - pctStart) * 0.4 + (written / totalSamples) * halfRange),
+        });
+        await yieldToMain();
+      }
     }
   }
 
+  onProgress({ step: "Lautstärke normalisieren", percent: pctEnd });
   return { buffer: out, gainDb };
 }
 
 // ── Step 5: Compression ───────────────────────────────────────────────────────
-// Standard dB-domain soft-knee compressor.
-// threshold and knee are in dBFS; gain reduction computed entirely in dB,
-// then converted to linear for the multiply — no more near-zero gain bug.
+// dB-domain soft-knee compressor — threshold in dBFS, never silences signal
 
 async function applyCompression(
   buffer: AudioBuffer,
   thresholdDb: number,
   ratio: number,
-  kneeDb: number
+  kneeDb: number,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
 ): Promise<AudioBuffer> {
+  onProgress({ step: "Dynamik komprimieren", percent: pctStart });
+
   const sr = buffer.sampleRate;
-  // Attack 3ms, release 150ms — expressed as per-sample coefficients
   const atkCoeff = Math.exp(-1 / (sr * 0.003));
   const relCoeff = Math.exp(-1 / (sr * 0.150));
   const kneeBottom = thresholdDb - kneeDb / 2;
   const kneeTop    = thresholdDb + kneeDb / 2;
+  const TINY = 1e-10;
 
   const out = makeBuffer(buffer.numberOfChannels, buffer.length, sr);
-  const YIELD_EVERY = 88200;
-  const TINY = 1e-10;
+  const totalSamples = buffer.numberOfChannels * buffer.length;
+  let worked = 0;
+  const pctRange = pctEnd - pctStart;
 
   for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
     const src = buffer.getChannelData(ch);
@@ -321,15 +380,12 @@ async function applyCompression(
 
     for (let i = 0; i < src.length; i++) {
       const absLin = Math.abs(src[i]);
-      // Envelope follower (linear domain)
       envLin = absLin > envLin
         ? atkCoeff * envLin + (1 - atkCoeff) * absLin
         : relCoeff * envLin + (1 - relCoeff) * absLin;
 
-      // Convert to dBFS
       const envDb = 20 * Math.log10(Math.max(envLin, TINY));
 
-      // Gain reduction (dB) — soft-knee
       let grDb = 0;
       if (envDb >= kneeTop) {
         grDb = (thresholdDb - envDb) * (1 - 1 / ratio);
@@ -337,20 +393,33 @@ async function applyCompression(
         const t = (envDb - kneeBottom) / kneeDb;
         grDb = (thresholdDb - envDb) * (1 - 1 / ratio) * t * t;
       }
-      // grDb is always <= 0 (gain reduction only, never boost)
 
       dst[i] = src[i] * Math.pow(10, grDb / 20);
 
-      if (i % YIELD_EVERY === 0) await yieldToMain();
+      if (++worked % YIELD_EVERY === 0) {
+        onProgress({
+          step: "Dynamik komprimieren",
+          percent: pctStart + Math.round((worked / totalSamples) * pctRange),
+        });
+        await yieldToMain();
+      }
     }
   }
 
+  onProgress({ step: "Dynamik komprimieren", percent: pctEnd });
   return out;
 }
 
 // ── Step 6 (Pro only): Noise Gate ─────────────────────────────────────────────
 
-async function applyNoiseGate(buffer: AudioBuffer): Promise<AudioBuffer> {
+async function applyNoiseGate(
+  buffer: AudioBuffer,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
+): Promise<AudioBuffer> {
+  onProgress({ step: "Rauschen reduzieren", percent: pctStart });
+
   const sr = buffer.sampleRate;
   const profileLen = Math.min(Math.floor(sr * 0.5), buffer.length);
   const noiseFloor = calcRms(buffer.getChannelData(0), 0, profileLen);
@@ -359,7 +428,9 @@ async function applyNoiseGate(buffer: AudioBuffer): Promise<AudioBuffer> {
   const atkS = Math.max(1, Math.floor(sr * 0.010));
   const relS = Math.max(1, Math.floor(sr * 0.080));
   const out = makeBuffer(buffer.numberOfChannels, buffer.length, sr);
-  const YIELD_EVERY = 88200;
+  const totalSamples = buffer.numberOfChannels * buffer.length;
+  let worked = 0;
+  const pctRange = pctEnd - pctStart;
 
   for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
     const src = buffer.getChannelData(ch);
@@ -371,16 +442,31 @@ async function applyNoiseGate(buffer: AudioBuffer): Promise<AudioBuffer> {
       env = abs > env ? env + (abs - env) / atkS : env + (abs - env) / relS;
       const gain = env >= gateThresh ? 1.0 : env / gateThresh;
       dst[i] = src[i] * gain;
-      if (i % YIELD_EVERY === 0) await yieldToMain();
+
+      if (++worked % YIELD_EVERY === 0) {
+        onProgress({
+          step: "Rauschen reduzieren",
+          percent: pctStart + Math.round((worked / totalSamples) * pctRange),
+        });
+        await yieldToMain();
+      }
     }
   }
 
+  onProgress({ step: "Rauschen reduzieren", percent: pctEnd });
   return out;
 }
 
 // ── Step 7 (Pro only): EQ ─────────────────────────────────────────────────────
 
-async function applyEQ(buffer: AudioBuffer): Promise<AudioBuffer> {
+async function applyEQ(
+  buffer: AudioBuffer,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
+): Promise<AudioBuffer> {
+  onProgress({ step: "EQ – Stimmklarheit anheben", percent: pctStart });
+
   const ctx = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
   const src = ctx.createBufferSource();
   src.buffer = buffer;
@@ -407,12 +493,21 @@ async function applyEQ(buffer: AudioBuffer): Promise<AudioBuffer> {
   air.connect(ctx.destination);
   src.start(0);
 
-  return ctx.startRendering();
+  const result = await ctx.startRendering();
+  onProgress({ step: "EQ – Stimmklarheit anheben", percent: pctEnd });
+  return result;
 }
 
 // ── WAV Export ────────────────────────────────────────────────────────────────
 
-function audioBufferToWav(buffer: AudioBuffer): Blob {
+function audioBufferToWav(
+  buffer: AudioBuffer,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
+): Blob {
+  onProgress({ step: "WAV exportieren", percent: pctStart });
+
   const nch = buffer.numberOfChannels;
   const sr  = buffer.sampleRate;
   const len = buffer.length;
@@ -451,10 +546,29 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
     }
   }
 
+  onProgress({ step: "WAV exportieren", percent: pctEnd });
   return new Blob([ab], { type: "audio/wav" });
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
+//
+// Step ranges (basic):
+//   decode        0 → 10
+//   silence-det  10 → 28
+//   trim         28 → 48
+//   normalize    48 → 68
+//   compress     68 → 88
+//   encode       88 → 100
+//
+// Step ranges (pro):
+//   decode        0 →  8
+//   noise-gate    8 → 20
+//   silence-det  20 → 35
+//   trim         35 → 50
+//   normalize    50 → 65
+//   compress     65 → 80
+//   EQ           80 → 92
+//   encode       92 → 100
 
 export async function processAudioBasic(
   file: File,
@@ -462,37 +576,27 @@ export async function processAudioBasic(
 ): Promise<{ blob: Blob; stats: ProcessingStats }> {
   const cfg = PRESET_CONFIG.basic;
 
-  onProgress({ step: "Audiodatei dekodieren", percent: 5 });
-  await yieldToMain();
-  const original = await decodeAudio(file);
+  const original = await decodeAudio(file, onProgress, 0, 10);
   const originalDuration = original.duration;
   const estimatedLufs = estimateLufs(original);
 
-  onProgress({ step: "Stille-Regionen erkennen", percent: 10 });
-  await yieldToMain();
   const silenceRegions = await detectSilenceRegions(
-    original, cfg.silenceThreshold, cfg.silenceMinDuration
+    original, cfg.silenceThreshold, cfg.silenceMinDuration, onProgress, 10, 28
   );
 
-  onProgress({ step: "Stille kürzen – Übergänge glätten", percent: 30 });
-  await yieldToMain();
-  const trimmed = await trimSilenceRegions(original, silenceRegions, cfg.keepPauseDuration);
+  const trimmed = await trimSilenceRegions(
+    original, silenceRegions, cfg.keepPauseDuration, onProgress, 28, 48
+  );
 
-  onProgress({ step: "Lautstärke normalisieren", percent: 60 });
-  await yieldToMain();
-  const { buffer: normalized, gainDb } = await normalizeLufs(trimmed, cfg.targetLufsDb);
+  const { buffer: normalized, gainDb } = await normalizeLufs(
+    trimmed, cfg.targetLufsDb, onProgress, 48, 68
+  );
 
-  onProgress({ step: "Dynamik komprimieren", percent: 85 });
-  await yieldToMain();
   const compressed = await applyCompression(
-    normalized, cfg.compThresholdDb, cfg.compRatio, cfg.compKneeDb
+    normalized, cfg.compThresholdDb, cfg.compRatio, cfg.compKneeDb, onProgress, 68, 88
   );
 
-  onProgress({ step: "WAV exportieren", percent: 95 });
-  await yieldToMain();
-  const blob = audioBufferToWav(compressed);
-
-  onProgress({ step: "Fertig", percent: 100 });
+  const blob = audioBufferToWav(compressed, onProgress, 88, 100);
 
   return {
     blob,
@@ -513,45 +617,31 @@ export async function processAudioPro(
 ): Promise<{ blob: Blob; stats: ProcessingStats }> {
   const cfg = PRESET_CONFIG[preset];
 
-  onProgress({ step: "Audiodatei dekodieren", percent: 5 });
-  await yieldToMain();
-  const original = await decodeAudio(file);
+  const original = await decodeAudio(file, onProgress, 0, 8);
   const originalDuration = original.duration;
   const estimatedLufs = estimateLufs(original);
 
-  onProgress({ step: "Rauschen reduzieren", percent: 12 });
-  await yieldToMain();
-  const denoised = await applyNoiseGate(original);
+  const denoised = await applyNoiseGate(original, onProgress, 8, 20);
 
-  onProgress({ step: "Stille-Regionen erkennen", percent: 22 });
-  await yieldToMain();
   const silenceRegions = await detectSilenceRegions(
-    denoised, cfg.silenceThreshold, cfg.silenceMinDuration
+    denoised, cfg.silenceThreshold, cfg.silenceMinDuration, onProgress, 20, 35
   );
 
-  onProgress({ step: "Stille kürzen – Übergänge glätten", percent: 38 });
-  await yieldToMain();
-  const trimmed = await trimSilenceRegions(denoised, silenceRegions, cfg.keepPauseDuration);
+  const trimmed = await trimSilenceRegions(
+    denoised, silenceRegions, cfg.keepPauseDuration, onProgress, 35, 50
+  );
 
-  onProgress({ step: "Lautstärke normalisieren", percent: 54 });
-  await yieldToMain();
-  const { buffer: normalized, gainDb } = await normalizeLufs(trimmed, cfg.targetLufsDb);
+  const { buffer: normalized, gainDb } = await normalizeLufs(
+    trimmed, cfg.targetLufsDb, onProgress, 50, 65
+  );
 
-  onProgress({ step: "Dynamik komprimieren", percent: 70 });
-  await yieldToMain();
   const compressed = await applyCompression(
-    normalized, cfg.compThresholdDb, cfg.compRatio, cfg.compKneeDb
+    normalized, cfg.compThresholdDb, cfg.compRatio, cfg.compKneeDb, onProgress, 65, 80
   );
 
-  onProgress({ step: "EQ – Stimmklarheit anheben", percent: 85 });
-  await yieldToMain();
-  const eqd = await applyEQ(compressed);
+  const eqd = await applyEQ(compressed, onProgress, 80, 92);
 
-  onProgress({ step: "WAV exportieren", percent: 95 });
-  await yieldToMain();
-  const blob = audioBufferToWav(eqd);
-
-  onProgress({ step: "Fertig", percent: 100 });
+  const blob = audioBufferToWav(eqd, onProgress, 92, 100);
 
   return {
     blob,
