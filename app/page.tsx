@@ -11,10 +11,13 @@ import {
   Upload,
   Sparkles,
   Wind,
-  Volume,
+  Volume2,
   Check,
   Crown,
   Info,
+  Waves,
+  Zap,
+  Radio,
 } from "lucide-react";
 import AudioPlayer from "./components/AudioPlayer";
 import ProcessingModal from "./components/ProcessingModal";
@@ -24,7 +27,14 @@ import CreditsPanel from "./components/CreditsPanel";
 import PresetSelector from "./components/PresetSelector";
 import { useAuth } from "./context/AuthContext";
 import { useCredits } from "./hooks/useCredits";
-import { processAudioBasic, processAudioPro, type ProcessingPreset, type ProcessingStats } from "./lib/audioProcessor";
+import {
+  processAudio,
+  processAudioPro,
+  type ProcessingPreset,
+  type ProcessingOptions,
+  type ProcessingStats,
+  DEFAULT_PROCESSING_OPTIONS,
+} from "./lib/audioProcessor";
 import { FREE_MAX_DURATION_SECONDS, PRO_MAX_DURATION_SECONDS } from "./lib/supabaseClient";
 
 export default function Home() {
@@ -43,6 +53,13 @@ export default function Home() {
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [processingStats, setProcessingStats] = useState<ProcessingStats | null>(null);
+
+  // Processing options
+  const [processingOptions, setProcessingOptions] = useState<ProcessingOptions>(DEFAULT_PROCESSING_OPTIONS);
+
+  const toggleOption = (key: keyof ProcessingOptions) => {
+    setProcessingOptions((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // UI-State
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -185,8 +202,8 @@ export default function Home() {
         await deductCredits(Math.ceil(duration));
         await logJob(originalFile.name, duration, selectedPreset);
       } else {
-        // Phase 1: Basic Free-Verarbeitung
-        const { blob, stats } = await processAudioBasic(originalFile, onProgress);
+        // Phase 1: Modular Free-Verarbeitung
+        const { blob, stats } = await processAudio(originalFile, processingOptions, onProgress);
         resultBlob = blob;
         setProcessingStats(stats);
       }
@@ -452,32 +469,77 @@ export default function Home() {
               </div>
             )}
 
-            {/* Aktive Verbesserungen (nur Free) */}
+            {/* Processing toggles (nur Free) */}
             {!isPro && (
-              <div className="flex" style={{ gap: "10px", flexWrap: "wrap" }}>
-                {[
-                  { icon: <Wind size={16} />, label: "Pausen kürzen" },
-                  { icon: <Volume size={16} />, label: "Lautstärke normalisieren" },
-                  { icon: <Sparkles size={16} />, label: "Leichte Kompression" },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center"
-                    style={{
-                      gap: "8px",
-                      padding: "8px 14px",
-                      background: "var(--color-accent-muted)",
-                      border: "1px solid var(--color-border-accent)",
-                      borderRadius: "3px",
-                      fontSize: "13px",
-                      color: "var(--color-accent)",
-                    }}
-                  >
-                    {item.icon}
-                    {item.label}
-                    <Check size={13} />
-                  </div>
-                ))}
+              <div className="flex flex-col" style={{ gap: "10px" }}>
+                <p style={{ margin: 0, fontSize: "12px", color: "var(--color-foreground-subtle)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  Verarbeitungsschritte
+                </p>
+                {(
+                  [
+                    { key: "trimSilence",  icon: <Wind size={15} />,    label: "Pausen kürzen",                     desc: "Stille automatisch kürzen" },
+                    { key: "highPass",     icon: <Radio size={15} />,   label: "Rumpeln entfernen",                 desc: "80 Hz High-Pass Filter" },
+                    { key: "normalize",    icon: <Volume2 size={15} />, label: "Lautstärke ausgleichen",            desc: "Peak normalize auf −1 dBFS" },
+                    { key: "compress",     icon: <Zap size={15} />,     label: "Leichte Sprachkompression",         desc: "Natürliche Dynamik erhalten" },
+                    { key: "dereverb",     icon: <Waves size={15} />,   label: "Raumhall reduzieren (leicht)",      desc: "Reflexionen reduzieren" },
+                  ] as Array<{ key: keyof ProcessingOptions; icon: ReturnType<typeof Wind>; label: string; desc: string }>
+                ).map(({ key, icon, label, desc }) => {
+                  const active = processingOptions[key];
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => toggleOption(key)}
+                      className="flex items-center"
+                      style={{
+                        gap: "12px",
+                        padding: "11px 16px",
+                        background: active ? "var(--color-accent-muted)" : "var(--color-surface)",
+                        border: `1px solid ${active ? "var(--color-border-accent)" : "var(--color-border)"}`,
+                        borderRadius: "3px",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "background 0.15s, border-color 0.15s",
+                        width: "100%",
+                      }}
+                    >
+                      <span style={{ color: active ? "var(--color-accent)" : "var(--color-foreground-subtle)", flexShrink: 0 }}>
+                        {icon}
+                      </span>
+                      <span className="flex flex-col" style={{ gap: "2px", flex: 1 }}>
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: active ? "var(--color-accent)" : "var(--color-foreground)" }}>
+                          {label}
+                        </span>
+                        <span style={{ fontSize: "12px", color: "var(--color-foreground-subtle)" }}>
+                          {desc}
+                        </span>
+                      </span>
+                      <span
+                        style={{
+                          width: "36px",
+                          height: "20px",
+                          borderRadius: "10px",
+                          background: active ? "var(--color-accent)" : "var(--color-border)",
+                          position: "relative",
+                          flexShrink: 0,
+                          transition: "background 0.15s",
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: "3px",
+                            left: active ? "18px" : "3px",
+                            width: "14px",
+                            height: "14px",
+                            borderRadius: "50%",
+                            background: "white",
+                            transition: "left 0.15s",
+                          }}
+                        />
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
