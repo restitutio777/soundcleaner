@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, Download, AudioLines } from "lucide-react";
 
 interface AudioPlayerProps {
-  // Erlaubt File (Original) oder Blob (verarbeitetes Audio)
   file: File | Blob | null;
   label?: string;
   isProcessed?: boolean;
@@ -24,7 +23,6 @@ export default function AudioPlayer({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioUrl, setAudioUrl] = useState<string>("");
 
-  // URL für File oder Blob erzeugen und aufräumen
   useEffect(() => {
     if (file) {
       const url = URL.createObjectURL(file);
@@ -86,7 +84,6 @@ export default function AudioPlayer({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Wellenform aus Fortschritt rendern
   const waveformBars = Array.from({ length: 80 }, (_, i) => {
     const height = Math.sin(i * 0.15) * 30 + 40 + ((i * 17 + 7) % 20);
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -94,7 +91,6 @@ export default function AudioPlayer({
     return { height, isActive };
   });
 
-  // Anzeigename bestimmen
   const displayName = label ?? (file instanceof File ? file.name : "Verarbeitete Aufnahme");
   const fileSize = file ? (file.size / (1024 * 1024)).toFixed(2) + " MB" : "";
 
@@ -108,21 +104,28 @@ export default function AudioPlayer({
         className="flex items-center justify-between"
         style={{ marginBottom: "20px" }}
       >
-        <div className="flex items-center" style={{ gap: "12px" }}>
+        <div className="flex items-center" style={{ gap: "14px", minWidth: 0, flex: 1 }}>
           <div
-            className={`icon-box ${isProcessed ? "icon-box-accent" : "icon-box-muted"}`}
-            style={{ width: "44px", height: "44px" }}
+            style={{
+              width: "44px",
+              height: "44px",
+              borderRadius: "12px",
+              background: isProcessed ? "var(--color-accent-muted)" : "var(--color-indigo-muted)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
           >
-            <AudioLines size={22} />
+            <AudioLines size={20} color={isProcessed ? "var(--color-accent)" : "var(--color-foreground-subtle)"} />
           </div>
-          <div className="flex flex-col" style={{ gap: "2px" }}>
+          <div className="flex flex-col" style={{ gap: "2px", minWidth: 0 }}>
             <h4
               style={{
                 margin: 0,
                 fontSize: "14px",
                 fontWeight: 600,
                 color: "var(--color-foreground)",
-                maxWidth: "300px",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -147,16 +150,15 @@ export default function AudioPlayer({
         {isProcessed && onDownload && (
           <button
             className="btn btn-primary flex items-center"
-            style={{ padding: "10px 20px", gap: "8px" }}
+            style={{ padding: "10px 20px", gap: "8px", flexShrink: 0, marginLeft: "12px" }}
             onClick={onDownload}
           >
             <Download size={15} />
-            Herunterladen
+            <span className="hide-mobile">Herunterladen</span>
           </button>
         )}
       </div>
 
-      {/* Wellenform-Visualisierung */}
       <div
         className="waveform-container"
         style={{
@@ -176,22 +178,21 @@ export default function AudioPlayer({
               style={{
                 width: "100%",
                 height: `${bar.height}%`,
-                opacity: bar.isActive ? 1 : 0.3,
+                opacity: bar.isActive ? 1 : 0.25,
               }}
             />
           ))}
         </div>
       </div>
 
-      {/* Timeline */}
       <div
         className="flex items-center"
-        style={{ gap: "12px", marginBottom: "14px" }}
+        style={{ gap: "12px", marginBottom: "16px" }}
       >
         <span
           style={{
             fontSize: "12px",
-            color: "var(--color-ice)",
+            color: "var(--color-foreground-muted)",
             minWidth: "36px",
             fontVariantNumeric: "tabular-nums",
           }}
@@ -210,7 +211,7 @@ export default function AudioPlayer({
         <span
           style={{
             fontSize: "12px",
-            color: "var(--color-ice)",
+            color: "var(--color-foreground-muted)",
             minWidth: "36px",
             fontVariantNumeric: "tabular-nums",
           }}
@@ -219,14 +220,13 @@ export default function AudioPlayer({
         </span>
       </div>
 
-      {/* Steuerung */}
       <div className="flex items-center justify-between">
         <button
           className="btn btn-primary"
           style={{
             width: "44px",
             height: "44px",
-            borderRadius: "3px",
+            borderRadius: "12px",
             padding: 0,
           }}
           onClick={togglePlay}
@@ -240,9 +240,9 @@ export default function AudioPlayer({
 
         <div
           className="flex items-center"
-          style={{ gap: "10px", flex: 1, maxWidth: "220px" }}
+          style={{ gap: "10px", flex: 1, maxWidth: "200px" }}
         >
-          <Volume2 size={16} color="var(--color-foreground-subtle)" />
+          <Volume2 size={15} color="var(--color-foreground-subtle)" />
           <input
             type="range"
             min="0"
@@ -254,9 +254,9 @@ export default function AudioPlayer({
           />
           <span
             style={{
-              fontSize: "12px",
+              fontSize: "11px",
               color: "var(--color-foreground-subtle)",
-              minWidth: "32px",
+              minWidth: "28px",
               fontWeight: 600,
               fontVariantNumeric: "tabular-nums",
             }}

@@ -8,12 +8,11 @@ interface ProcessingModalProps {
   isOpen: boolean;
   currentStep: string;
   percent: number;
-  completedSteps: string[];     // Von page.tsx gepflegt – kein interner Ref nötig
+  completedSteps: string[];
   stats?: ProcessingStats | null;
   error?: string | null;
 }
 
-// Sekunden in "0:00" formatieren
 function formatDuration(sec: number): string {
   if (!isFinite(sec) || sec < 0) return "0:00";
   const m = Math.floor(sec / 60);
@@ -32,13 +31,11 @@ export default function ProcessingModal({
   const isDone = percent >= 100;
   const hasError = !!error;
 
-  // Countdown für automatisches Schließen nach Fehler (2,5 Sekunden)
   const [errorCountdown, setErrorCountdown] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (hasError && isOpen) {
-      // Countdown von 2,5s → 0 in 50ms-Schritten
       setErrorCountdown(100);
       timerRef.current = setInterval(() => {
         setErrorCountdown((v) => {
@@ -46,7 +43,7 @@ export default function ProcessingModal({
             clearInterval(timerRef.current!);
             return 0;
           }
-          return v - 2; // 100 Schritte × 2 = 200 × 12.5ms ≈ 2.5s
+          return v - 2;
         });
       }, 25);
     }
@@ -57,7 +54,6 @@ export default function ProcessingModal({
 
   if (!isOpen) return null;
 
-  // Zeitersparnis berechnen für Statistik-Anzeige
   const timeSaved = stats
     ? Math.max(0, stats.originalDuration - stats.processedDuration)
     : 0;
@@ -66,17 +62,17 @@ export default function ProcessingModal({
     <div className="modal-backdrop animate-scale-in">
       <div
         className="modal"
-        style={{ width: "500px", padding: "36px" }}
+        style={{ width: "480px", padding: "32px" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-col" style={{ gap: "22px" }}>
+        <div className="flex flex-col" style={{ gap: "24px" }}>
 
-          {/* ── Status-Icon ── */}
+          {/* Status icon */}
           <div
             style={{
-              width: "52px",
-              height: "52px",
-              borderRadius: "3px",
+              width: "48px",
+              height: "48px",
+              borderRadius: "14px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -90,21 +86,21 @@ export default function ProcessingModal({
             }}
           >
             {hasError ? (
-              <AlertCircle size={26} color="var(--color-danger)" />
+              <AlertCircle size={24} color="var(--color-danger)" />
             ) : isDone ? (
-              <CheckCircle size={26} color="var(--color-success)" />
+              <CheckCircle size={24} color="var(--color-success)" />
             ) : (
-              <Loader2 size={26} color="var(--color-accent)" className="animate-spin" />
+              <Loader2 size={24} color="var(--color-accent)" className="animate-spin" />
             )}
           </div>
 
-          {/* ── Titel ── */}
-          <div className="flex flex-col" style={{ gap: "4px" }}>
+          {/* Title */}
+          <div className="flex flex-col" style={{ gap: "6px" }}>
             <h3
               style={{
                 margin: 0,
                 fontFamily: "var(--font-display)",
-                fontSize: "22px",
+                fontSize: "21px",
                 fontWeight: 400,
                 color: "var(--color-foreground)",
                 lineHeight: 1.2,
@@ -127,12 +123,12 @@ export default function ProcessingModal({
               {hasError
                 ? error
                 : isDone
-                  ? "Alle Schritte abgeschlossen. Die bereinigte Datei ist bereit zum Abhören und Herunterladen."
-                  : "Bitte warten\u200B – die Datei wird direkt im Browser verarbeitet, kein Upload nötig."}
+                  ? "Alle Schritte abgeschlossen. Die bereinigte Datei ist bereit."
+                  : "Wird direkt im Browser verarbeitet \u2013 kein Upload nötig."}
             </p>
           </div>
 
-          {/* ── Fehler-Countdown-Balken ── */}
+          {/* Error countdown bar */}
           {hasError && (
             <div style={{ width: "100%" }}>
               <div className="progress-bar">
@@ -147,34 +143,35 @@ export default function ProcessingModal({
               </div>
               <p
                 style={{
-                  margin: "6px 0 0",
+                  margin: "8px 0 0",
                   fontSize: "11px",
                   color: "var(--color-foreground-subtle)",
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                 }}
               >
-                Fenster schließt automatisch…
+                Fenster schliesst automatisch...
               </p>
             </div>
           )}
 
-          {/* ── Fortschrittsbalken (während Verarbeitung) ── */}
+          {/* Progress bar */}
           {!hasError && (
             <div style={{ width: "100%" }}>
-              <div className="progress-bar">
+              <div className="progress-bar" style={{ height: "5px", borderRadius: "3px" }}>
                 <div
                   className="progress-fill"
                   style={{
                     width: `${percent}%`,
                     background: isDone ? "var(--color-success)" : "var(--color-accent)",
                     transition: "width 0.3s ease",
+                    borderRadius: "3px",
                   }}
                 />
               </div>
               <div
                 className="flex items-center justify-between"
-                style={{ marginTop: "6px" }}
+                style={{ marginTop: "8px" }}
               >
                 <span
                   style={{
@@ -188,7 +185,7 @@ export default function ProcessingModal({
                 </span>
                 <span
                   style={{
-                    fontSize: "12px",
+                    fontSize: "13px",
                     fontWeight: 700,
                     color: isDone ? "var(--color-success)" : "var(--color-accent)",
                     fontVariantNumeric: "tabular-nums",
@@ -200,7 +197,7 @@ export default function ProcessingModal({
             </div>
           )}
 
-          {/* ── Schritt-Protokoll ── */}
+          {/* Step log */}
           {!hasError && (
             <StepLog
               completedSteps={completedSteps}
@@ -209,23 +206,23 @@ export default function ProcessingModal({
             />
           )}
 
-          {/* ── Statistik-Zusammenfassung (nur wenn fertig) ── */}
+          {/* Stats */}
           {isDone && stats && (
             <ProcessingStatsSummary stats={stats} timeSaved={timeSaved} />
           )}
 
-          {/* ── Datenschutz-Hinweis (nur während Verarbeitung) ── */}
+          {/* Privacy note */}
           {!hasError && !isDone && (
             <p
               style={{
                 margin: 0,
                 fontSize: "11px",
                 color: "var(--color-foreground-subtle)",
-                opacity: 0.65,
+                opacity: 0.6,
                 lineHeight: 1.5,
               }}
             >
-              Die Verarbeitung erfolgt vollständig in deinem Browser – deine Aufnahme wird nicht hochgeladen.
+              Die Verarbeitung erfolgt vollständig in deinem Browser.
             </p>
           )}
         </div>
@@ -233,8 +230,6 @@ export default function ProcessingModal({
     </div>
   );
 }
-
-// ─── Schritt-Protokoll-Unterkomponente ───────────────────────────────────────
 
 interface StepLogProps {
   completedSteps: string[];
@@ -245,7 +240,6 @@ interface StepLogProps {
 function StepLog({ completedSteps, currentStep, isDone }: StepLogProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Automatisch zum Ende scrollen wenn neue Schritte hinzukommen
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -258,24 +252,23 @@ function StepLog({ completedSteps, currentStep, isDone }: StepLogProps) {
       style={{
         background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
-        borderRadius: "3px",
-        padding: "12px 14px",
+        borderRadius: "10px",
+        padding: "14px 16px",
         display: "flex",
         flexDirection: "column",
-        gap: "6px",
-        maxHeight: "176px",
+        gap: "8px",
+        maxHeight: "180px",
         overflowY: "auto",
         scrollBehavior: "smooth",
       }}
     >
-      {/* Abgeschlossene Schritte mit Häkchen */}
       {completedSteps.map((step, i) => (
-        <div key={i} className="flex items-center" style={{ gap: "9px", flexShrink: 0 }}>
+        <div key={i} className="flex items-center" style={{ gap: "10px", flexShrink: 0 }}>
           <div
             style={{
-              width: "15px",
-              height: "15px",
-              borderRadius: "2px",
+              width: "18px",
+              height: "18px",
+              borderRadius: "5px",
               background: "var(--color-accent)",
               display: "flex",
               alignItems: "center",
@@ -283,23 +276,22 @@ function StepLog({ completedSteps, currentStep, isDone }: StepLogProps) {
               flexShrink: 0,
             }}
           >
-            <CheckCircle size={9} color="#fff" />
+            <CheckCircle size={10} color="#fff" />
           </div>
-          <span style={{ fontSize: "12px", color: "var(--color-foreground-subtle)" }}>
+          <span style={{ fontSize: "12px", color: "var(--color-foreground-muted)" }}>
             {step}
           </span>
         </div>
       ))}
 
-      {/* Aktiver Schritt mit pulsierender Markierung */}
       {!isDone && currentStep && (
-        <div className="flex items-center" style={{ gap: "9px", flexShrink: 0 }}>
+        <div className="flex items-center" style={{ gap: "10px", flexShrink: 0 }}>
           <div
             className="animate-pulse"
             style={{
-              width: "15px",
-              height: "15px",
-              borderRadius: "2px",
+              width: "18px",
+              height: "18px",
+              borderRadius: "5px",
               background: "var(--color-accent-muted)",
               border: "1.5px solid var(--color-accent)",
               display: "flex",
@@ -310,9 +302,9 @@ function StepLog({ completedSteps, currentStep, isDone }: StepLogProps) {
           >
             <div
               style={{
-                width: "5px",
-                height: "5px",
-                borderRadius: "1px",
+                width: "6px",
+                height: "6px",
+                borderRadius: "2px",
                 background: "var(--color-accent)",
               }}
             />
@@ -323,14 +315,13 @@ function StepLog({ completedSteps, currentStep, isDone }: StepLogProps) {
         </div>
       )}
 
-      {/* Abschluss-Zeile */}
       {isDone && (
-        <div className="flex items-center" style={{ gap: "9px", flexShrink: 0 }}>
+        <div className="flex items-center" style={{ gap: "10px", flexShrink: 0 }}>
           <div
             style={{
-              width: "15px",
-              height: "15px",
-              borderRadius: "2px",
+              width: "18px",
+              height: "18px",
+              borderRadius: "5px",
               background: "var(--color-success)",
               display: "flex",
               alignItems: "center",
@@ -338,7 +329,7 @@ function StepLog({ completedSteps, currentStep, isDone }: StepLogProps) {
               flexShrink: 0,
             }}
           >
-            <CheckCircle size={9} color="#fff" />
+            <CheckCircle size={10} color="#fff" />
           </div>
           <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-success)" }}>
             Alle Schritte abgeschlossen
@@ -348,8 +339,6 @@ function StepLog({ completedSteps, currentStep, isDone }: StepLogProps) {
     </div>
   );
 }
-
-// ─── Statistik-Zusammenfassung Unterkomponente ────────────────────────────────
 
 interface ProcessingStatsSummaryProps {
   stats: ProcessingStats;
@@ -365,35 +354,30 @@ function ProcessingStatsSummary({ stats, timeSaved }: ProcessingStatsSummaryProp
       style={{
         background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
-        borderRadius: "3px",
-        padding: "14px 16px",
+        borderRadius: "10px",
+        padding: "16px",
         display: "grid",
         gridTemplateColumns: "1fr 1fr 1fr",
-        gap: "12px",
+        gap: "16px",
       }}
     >
-      {/* Originallänge → Verarbeitete Länge */}
       <StatCard
         icon={<Clock size={13} color="var(--color-accent)" />}
         label="Dauer"
-        value={`${formatDuration(stats.originalDuration)} → ${formatDuration(stats.processedDuration)}`}
+        value={`${formatDuration(stats.originalDuration)} \u2192 ${formatDuration(stats.processedDuration)}`}
         sub={timeSaved >= 1 ? `${formatDuration(timeSaved)} eingespart` : "keine Pausen gefunden"}
       />
-
-      {/* Gain-Korrektur */}
       <StatCard
         icon={<TrendingUp size={13} color="var(--color-accent)" />}
         label="Gain"
         value={`${gainSign}${stats.gainAppliedDb.toFixed(1)} dB`}
-        sub={`von ${lufsRounded} LUFS → -16 LUFS`}
+        sub={`von ${lufsRounded} dBFS`}
       />
-
-      {/* Anzahl gekürzter Pausen */}
       <StatCard
         icon={<Scissors size={13} color="var(--color-accent)" />}
         label="Pausen"
         value={`${stats.silenceRegionsFound}`}
-        sub={stats.silenceRegionsFound === 1 ? "Region gekürzt" : "Regionen gekürzt"}
+        sub={stats.silenceRegionsFound === 1 ? "Region gekurzt" : "Regionen gekurzt"}
       />
     </div>
   );
@@ -408,7 +392,7 @@ interface StatCardProps {
 
 function StatCard({ icon, label, value, sub }: StatCardProps) {
   return (
-    <div className="flex flex-col" style={{ gap: "5px" }}>
+    <div className="flex flex-col" style={{ gap: "6px" }}>
       <div className="flex items-center" style={{ gap: "5px" }}>
         {icon}
         <span

@@ -94,7 +94,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
               marginBottom: "20px",
               background: "var(--color-success-bg)",
               border: "1px solid rgba(74, 222, 128, 0.2)",
-              borderRadius: "3px",
+              borderRadius: "10px",
               fontSize: "14px",
               color: "var(--color-success)",
             }}
@@ -111,7 +111,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
               marginBottom: "20px",
               background: "var(--color-danger-bg)",
               border: "1px solid rgba(248, 113, 113, 0.2)",
-              borderRadius: "3px",
+              borderRadius: "10px",
               fontSize: "14px",
               color: "var(--color-danger)",
             }}
@@ -131,7 +131,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
             <div className="flex items-center" style={{
               background: "var(--color-surface)",
               border: "1px solid var(--color-border)",
-              borderRadius: "3px",
+              borderRadius: "10px",
               padding: "0 14px",
               gap: "10px",
             }}>
@@ -165,7 +165,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
             <div className="flex items-center" style={{
               background: "var(--color-surface)",
               border: "1px solid var(--color-border)",
-              borderRadius: "3px",
+              borderRadius: "10px",
               padding: "0 14px",
               gap: "10px",
             }}>

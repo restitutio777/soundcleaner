@@ -43,7 +43,7 @@ export default function CreditsPanel({ onLoginClick, onBuyCreditsClick }: Credit
         style={{
           background: "var(--color-elevated)",
           border: `1px solid ${isLow ? "rgba(248, 113, 113, 0.4)" : "var(--color-border)"}`,
-          borderRadius: "3px",
+          borderRadius: "10px",
           padding: "8px 14px",
           gap: "10px",
           cursor: "pointer",
@@ -113,7 +113,7 @@ export default function CreditsPanel({ onLoginClick, onBuyCreditsClick }: Credit
             right: 0,
             background: "var(--color-elevated)",
             border: "1px solid var(--color-border)",
-            borderRadius: "4px",
+            borderRadius: "12px",
             width: "260px",
             zIndex: 40,
             overflow: "hidden",
