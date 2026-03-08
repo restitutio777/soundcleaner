@@ -1,7 +1,3 @@
-/**
- * KlangRein -- Hauptseite
- */
-
 "use client";
 
 import { useState, useCallback } from "react";
@@ -17,7 +13,6 @@ import {
   Waves,
   Zap,
   Radio,
-  AudioLines,
   ArrowRight,
 } from "lucide-react";
 import AudioPlayer from "./components/AudioPlayer";
@@ -38,16 +33,40 @@ import {
 } from "./lib/audioProcessor";
 import { FREE_MAX_DURATION_SECONDS, PRO_MAX_DURATION_SECONDS } from "./lib/supabaseClient";
 
+function LogoMark() {
+  return (
+    <div
+      style={{
+        width: "38px",
+        height: "38px",
+        borderRadius: "10px",
+        background: "linear-gradient(135deg, rgba(191, 111, 132, 0.2) 0%, rgba(191, 111, 132, 0.08) 100%)",
+        border: "1px solid rgba(191, 111, 132, 0.15)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+        flexShrink: 0,
+      }}
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 12h2l2-6 3 12 3-8 2 4h2" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="20" cy="12" r="2" fill="var(--color-accent)" opacity="0.6" />
+      </svg>
+    </div>
+  );
+}
+
 const TOGGLE_OPTIONS: Array<{
   key: keyof ProcessingOptions;
   icon: typeof Wind;
   label: string;
   desc: string;
 }> = [
-  { key: "trimSilence", icon: Wind, label: "Pausen kurzen", desc: "Stille automatisch kurzen" },
+  { key: "trimSilence", icon: Wind, label: "Pausen kürzen", desc: "Stille automatisch kürzen" },
   { key: "highPass", icon: Radio, label: "Rumpeln entfernen", desc: "80 Hz High-Pass Filter" },
   { key: "normalize", icon: Volume2, label: "Lautstärke ausgleichen", desc: "Peak normalize auf -1 dBFS" },
-  { key: "compress", icon: Zap, label: "Leichte Sprachkompression", desc: "Naturliche Dynamik erhalten" },
+  { key: "compress", icon: Zap, label: "Leichte Sprachkompression", desc: "Natürliche Dynamik erhalten" },
   { key: "dereverb", icon: Waves, label: "Raumhall reduzieren", desc: "Reflexionen leicht reduzieren" },
 ];
 
@@ -89,7 +108,7 @@ export default function Home() {
 
   const validateFile = (file: File): string | null => {
     if (!file.type.startsWith("audio/")) {
-      return "Nur Audio-Dateien werden unterstutzt (MP3, WAV, M4A, FLAC).";
+      return "Nur Audio-Dateien werden unterstützt (MP3, WAV, M4A, FLAC).";
     }
     return null;
   };
@@ -115,14 +134,14 @@ export default function Home() {
 
     if (!isPro && duration > FREE_MAX_DURATION_SECONDS) {
       showToast(
-        `Kostenlose Version: max. ${FREE_MAX_DURATION_SECONDS / 60} Minuten. Melde dich an fur die Pro-Version.`,
+        `Kostenlose Version: max. ${FREE_MAX_DURATION_SECONDS / 60} Minuten. Melde dich an für die Pro-Version.`,
         "error"
       );
       return;
     }
 
     if (isPro && duration > PRO_MAX_DURATION_SECONDS) {
-      showToast(`Maximale Lange: ${PRO_MAX_DURATION_SECONDS / 60} Minuten.`, "error");
+      showToast(`Maximale Länge: ${PRO_MAX_DURATION_SECONDS / 60} Minuten.`, "error");
       return;
     }
 
@@ -255,35 +274,32 @@ export default function Home() {
         minHeight: "100vh",
         position: "relative",
         zIndex: 1,
-        padding: "48px 24px 96px",
+        padding: "0 24px 96px",
       }}
     >
       <div
         className="flex flex-col"
-        style={{ maxWidth: "720px", width: "100%", margin: "0 auto", gap: "48px" }}
+        style={{ maxWidth: "720px", width: "100%", margin: "0 auto" }}
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between animate-fade-in">
-          <div className="flex items-center" style={{ gap: "10px" }}>
-            <div
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "10px",
-                background: "var(--color-accent-muted)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <AudioLines size={18} color="var(--color-accent)" />
-            </div>
+        <header
+          className="flex items-center justify-between animate-fade-in"
+          style={{
+            padding: "20px 0",
+            position: "sticky",
+            top: 0,
+            zIndex: 30,
+            background: "linear-gradient(180deg, var(--color-base) 70%, transparent 100%)",
+          }}
+        >
+          <div className="flex items-center" style={{ gap: "11px" }}>
+            <LogoMark />
             <span
               style={{
                 fontFamily: "var(--font-display)",
                 fontSize: "22px",
                 color: "var(--color-ice)",
-                letterSpacing: "0.02em",
+                letterSpacing: "0.01em",
               }}
             >
               KlangRein
@@ -296,337 +312,344 @@ export default function Home() {
               setAuthModalOpen(true);
             }}
             onBuyCreditsClick={() => {
-              showToast("Stripe-Integration folgt in Kurze.", "success");
+              showToast("Stripe-Integration folgt in Kürze.", "success");
             }}
           />
-        </div>
+        </header>
 
-        {/* ── Hero ── */}
-        {!originalFile && (
-          <div className="flex flex-col animate-slide-up" style={{ gap: "24px" }}>
-            <div className="flex flex-col" style={{ gap: "16px" }}>
-              <h1
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "clamp(38px, 5.5vw, 56px)",
-                  fontWeight: 400,
-                  color: "var(--color-foreground)",
-                  margin: 0,
-                  lineHeight: 1.15,
-                  letterSpacing: "-0.02em",
-                }}
+        <div className="flex flex-col" style={{ gap: "48px", paddingTop: "24px" }}>
+          {/* ── Hero ── */}
+          {!originalFile && (
+            <div className="flex flex-col" style={{ gap: "28px" }}>
+              <div className="flex flex-col" style={{ gap: "16px" }}>
+                <h1
+                  className="animate-slide-up"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "clamp(40px, 6vw, 60px)",
+                    fontWeight: 400,
+                    color: "var(--color-foreground)",
+                    margin: 0,
+                    lineHeight: 1.1,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  Dein Audio.
+                  <br />
+                  <span style={{ color: "var(--color-accent)" }}>Kristallklar.</span>
+                </h1>
+                <p
+                  className="animate-slide-up"
+                  style={{
+                    fontSize: "16px",
+                    color: "var(--color-foreground-muted)",
+                    margin: 0,
+                    lineHeight: 1.7,
+                    maxWidth: "460px",
+                    animationDelay: "0.06s",
+                  }}
+                >
+                  Upload deine Aufnahme, wir schneiden Pausen und optimieren
+                  die Lautstärke. Fertige Datei herunterladen.
+                </p>
+              </div>
+
+              <div
+                className="flex animate-slide-up"
+                style={{ gap: "10px", flexWrap: "wrap", animationDelay: "0.12s" }}
               >
-                Dein Audio.
-                <br />
-                <span style={{ color: "var(--color-accent)" }}>Kristallklar.</span>
-              </h1>
-              <p
-                style={{
-                  fontSize: "16px",
-                  color: "var(--color-foreground-muted)",
-                  margin: 0,
-                  lineHeight: 1.65,
-                  maxWidth: "440px",
-                }}
-              >
-                Upload deine Aufnahme, wir schneiden Pausen und optimieren
-                die Lautstärke. Fertige Datei herunterladen.
-              </p>
+                <span className="badge badge-default">
+                  <Sparkles size={14} color="var(--color-accent)" />
+                  Kostenlos bis 3 Min.
+                </span>
+                <span className="badge badge-accent">
+                  <Crown size={14} />
+                  Pro bis 60 Min. + Presets
+                </span>
+              </div>
             </div>
+          )}
 
-            <div className="flex" style={{ gap: "10px", flexWrap: "wrap" }}>
+          {/* ── Upload Zone ── */}
+          {!originalFile ? (
+            <label
+              className={`upload-zone ${isDragging ? "drag-over" : ""} animate-slide-up`}
+              style={{
+                width: "100%",
+                padding: "64px 32px",
+                cursor: "pointer",
+                display: "block",
+                animationDelay: "0.18s",
+              }}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <input
+                type="file"
+                accept="audio/*"
+                onChange={handleFileInput}
+                style={{ display: "none" }}
+              />
+              <div
+                className="flex flex-col items-center"
+                style={{ gap: "20px", position: "relative", zIndex: 1 }}
+              >
+                <div
+                  className="animate-float"
+                  style={{
+                    width: "64px",
+                    height: "64px",
+                    borderRadius: "18px",
+                    background: "linear-gradient(135deg, rgba(191, 111, 132, 0.18) 0%, rgba(191, 111, 132, 0.06) 100%)",
+                    border: "1px solid rgba(191, 111, 132, 0.15)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Upload size={26} color="var(--color-accent)" />
+                </div>
+                <div className="flex flex-col items-center" style={{ gap: "8px" }}>
+                  <p style={{
+                    fontSize: "17px",
+                    fontWeight: 600,
+                    color: "var(--color-foreground)",
+                    margin: 0,
+                    letterSpacing: "-0.01em",
+                  }}>
+                    Audio-Datei hierher ziehen
+                  </p>
+                  <p style={{ fontSize: "14px", color: "var(--color-foreground-subtle)", margin: 0, lineHeight: 1.5 }}>
+                    oder klicken zum Durchsuchen — MP3, WAV, M4A, FLAC
+                  </p>
+                  <p style={{
+                    fontSize: "12px",
+                    color: "var(--color-foreground-subtle)",
+                    margin: 0,
+                    marginTop: "6px",
+                    opacity: 0.7,
+                  }}>
+                    {isPro ? "Pro: bis zu 60 Minuten" : "Kostenlos: bis zu 3 Minuten"}
+                  </p>
+                </div>
+              </div>
+            </label>
+          ) : (
+            <div className="flex flex-col animate-scale-in" style={{ width: "100%", gap: "24px" }}>
+              <AudioPlayer file={originalFile} label={originalFile.name} />
+            </div>
+          )}
+
+          {/* ── Processing Options ── */}
+          {originalFile && !processedBlob && (
+            <div className="flex flex-col animate-slide-up" style={{ width: "100%", gap: "24px" }}>
+              {isPro ? (
+                <PresetSelector selected={selectedPreset} onChange={setSelectedPreset} />
+              ) : (
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    background: "var(--color-surface)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "12px",
+                    display: "flex",
+                    gap: "14px",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "34px",
+                      height: "34px",
+                      borderRadius: "9px",
+                      background: "var(--color-accent-muted)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Info size={16} color="var(--color-accent)" />
+                  </div>
+                  <div className="flex flex-col" style={{ gap: "4px" }}>
+                    <p style={{ margin: 0, fontSize: "14px", color: "var(--color-foreground)", fontWeight: 600 }}>
+                      Kostenlose Version
+                    </p>
+                    <p style={{ margin: 0, fontSize: "13px", color: "var(--color-foreground-subtle)", lineHeight: 1.6 }}>
+                      Pausen und Lautstärke werden automatisch optimiert.
+                      Für erweiterte Funktionen{" "}
+                      <button
+                        className="btn btn-ghost"
+                        style={{
+                          padding: 0,
+                          fontSize: "13px",
+                          color: "var(--color-accent)",
+                          textDecoration: "underline",
+                          textTransform: "none",
+                          letterSpacing: 0,
+                          display: "inline",
+                        }}
+                        onClick={() => {
+                          setAuthModalMode("register");
+                          setAuthModalOpen(true);
+                        }}
+                      >
+                        anmelden
+                      </button>
+                      .
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!isPro && (
+                <div className="flex flex-col" style={{ gap: "6px" }}>
+                  <p style={{
+                    margin: "0 0 6px",
+                    fontSize: "11px",
+                    color: "var(--color-foreground-subtle)",
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    fontWeight: 600,
+                  }}>
+                    Verarbeitungsschritte
+                  </p>
+                  {TOGGLE_OPTIONS.map(({ key, icon: Icon, label, desc }) => {
+                    const active = processingOptions[key];
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => toggleOption(key)}
+                        className={`toggle-row ${active ? "active" : ""}`}
+                      >
+                        <div
+                          style={{
+                            width: "34px",
+                            height: "34px",
+                            borderRadius: "9px",
+                            background: active ? "var(--color-accent-muted)" : "var(--color-indigo-muted)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            transition: "all 0.25s ease",
+                          }}
+                        >
+                          <Icon size={16} color={active ? "var(--color-accent)" : "var(--color-foreground-subtle)"} />
+                        </div>
+                        <div className="flex flex-col" style={{ gap: "1px", flex: 1 }}>
+                          <span style={{
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            color: active ? "var(--color-foreground)" : "var(--color-foreground-muted)",
+                            transition: "color 0.2s",
+                          }}>
+                            {label}
+                          </span>
+                          <span style={{ fontSize: "12px", color: "var(--color-foreground-subtle)" }}>
+                            {desc}
+                          </span>
+                        </div>
+                        <div className={`toggle-track ${active ? "on" : ""}`}>
+                          <div className="toggle-thumb" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {isPro && credits && !hasEnoughCredits(60) && (
+                <div
+                  style={{
+                    padding: "12px 16px",
+                    background: "var(--color-warning-bg)",
+                    border: "1px solid rgba(251, 191, 36, 0.2)",
+                    borderRadius: "10px",
+                    fontSize: "13px",
+                    color: "var(--color-warning)",
+                  }}
+                >
+                  Guthaben niedrig: {formatCredits(credits.credits_seconds)} verbleibend.
+                </div>
+              )}
+
+              <div className="flex items-center" style={{ gap: "12px" }}>
+                <button
+                  className="btn btn-primary flex items-center"
+                  style={{ padding: "14px 28px", fontSize: "13px", gap: "10px" }}
+                  onClick={handleProcess}
+                  disabled={isProcessing}
+                >
+                  {isPro ? <Crown size={16} /> : <Sparkles size={16} />}
+                  {isPro
+                    ? `Pro: Audio bereinigen (${selectedPreset})`
+                    : "Audio bereinigen"}
+                  <ArrowRight size={15} />
+                </button>
+
+                <button
+                  className="btn btn-ghost"
+                  style={{ padding: "12px 18px", fontSize: "13px" }}
+                  onClick={resetAll}
+                >
+                  Andere Datei
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Result ── */}
+          {processedBlob && (
+            <div className="flex flex-col animate-scale-in" style={{ width: "100%", gap: "24px" }}>
               <div
                 className="flex items-center"
                 style={{
-                  gap: "8px",
-                  padding: "9px 16px",
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  color: "var(--color-foreground-muted)",
-                }}
-              >
-                <Sparkles size={14} color="var(--color-accent)" />
-                Kostenlos bis 3 Min.
-              </div>
-
-              <div
-                className="flex items-center"
-                style={{
-                  gap: "8px",
-                  padding: "9px 16px",
-                  background: "var(--color-accent-muted)",
-                  border: "1px solid var(--color-border-accent)",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  color: "var(--color-accent)",
-                }}
-              >
-                <Crown size={14} />
-                Pro bis 60 Min. + Presets
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Upload Zone ── */}
-        {!originalFile ? (
-          <label
-            className={`upload-zone ${isDragging ? "drag-over" : ""} animate-slide-up`}
-            style={{
-              width: "100%",
-              padding: "56px 32px",
-              cursor: "pointer",
-              display: "block",
-              animationDelay: "0.06s",
-              animationFillMode: "both",
-            }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <input
-              type="file"
-              accept="audio/*"
-              onChange={handleFileInput}
-              style={{ display: "none" }}
-            />
-            <div className="flex flex-col items-center" style={{ gap: "20px" }}>
-              <div
-                style={{
-                  width: "60px",
-                  height: "60px",
-                  borderRadius: "16px",
-                  background: "var(--color-accent-muted)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Upload size={24} color="var(--color-accent)" />
-              </div>
-              <div className="flex flex-col items-center" style={{ gap: "6px" }}>
-                <p style={{ fontSize: "16px", fontWeight: 600, color: "var(--color-foreground)", margin: 0 }}>
-                  Audio-Datei hierher ziehen
-                </p>
-                <p style={{ fontSize: "14px", color: "var(--color-foreground-subtle)", margin: 0 }}>
-                  oder klicken zum Durchsuchen — MP3, WAV, M4A, FLAC
-                </p>
-                <p style={{ fontSize: "12px", color: "var(--color-foreground-subtle)", margin: 0, marginTop: "4px" }}>
-                  {isPro ? "Pro: bis zu 60 Minuten" : "Kostenlos: bis zu 3 Minuten"}
-                </p>
-              </div>
-            </div>
-          </label>
-        ) : (
-          <div className="flex flex-col animate-scale-in" style={{ width: "100%", gap: "24px" }}>
-            <AudioPlayer file={originalFile} label={originalFile.name} />
-          </div>
-        )}
-
-        {/* ── Processing Options (post-upload, pre-process) ── */}
-        {originalFile && !processedBlob && (
-          <div className="flex flex-col animate-slide-up" style={{ width: "100%", gap: "24px" }}>
-
-            {isPro ? (
-              <PresetSelector selected={selectedPreset} onChange={setSelectedPreset} />
-            ) : (
-              <div
-                style={{
-                  padding: "16px 20px",
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
+                  gap: "12px",
+                  padding: "14px 18px",
+                  background: "var(--color-success-bg)",
+                  border: "1px solid rgba(74, 222, 128, 0.15)",
                   borderRadius: "12px",
-                  display: "flex",
-                  gap: "14px",
-                  alignItems: "flex-start",
                 }}
               >
                 <div
                   style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "8px",
-                    background: "var(--color-accent-muted)",
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "50%",
+                    background: "rgba(74, 222, 128, 0.15)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
-                    marginTop: "1px",
                   }}
                 >
-                  <Info size={15} color="var(--color-accent)" />
+                  <Check size={14} color="var(--color-success)" />
                 </div>
-                <div className="flex flex-col" style={{ gap: "4px" }}>
-                  <p style={{ margin: 0, fontSize: "14px", color: "var(--color-foreground)", fontWeight: 600 }}>
-                    Kostenlose Version
-                  </p>
-                  <p style={{ margin: 0, fontSize: "13px", color: "var(--color-foreground-subtle)", lineHeight: 1.6 }}>
-                    Passen und Lautstärke werden automatisch optimiert.
-                    Fur erweiterte Funktionen{" "}
-                    <button
-                      className="btn btn-ghost"
-                      style={{ padding: 0, fontSize: "13px", color: "var(--color-accent)", textDecoration: "underline", textTransform: "none", letterSpacing: 0 }}
-                      onClick={() => {
-                        setAuthModalMode("register");
-                        setAuthModalOpen(true);
-                      }}
-                    >
-                      anmelden
-                    </button>
-                    .
-                  </p>
-                </div>
+                <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-success)" }}>
+                  Audio erfolgreich bereinigt
+                  {isPro && ` · Preset: ${selectedPreset}`}
+                </span>
               </div>
-            )}
 
-            {/* Toggle controls */}
-            {!isPro && (
-              <div className="flex flex-col" style={{ gap: "8px" }}>
-                <p style={{
-                  margin: "0 0 4px",
-                  fontSize: "11px",
-                  color: "var(--color-foreground-subtle)",
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}>
-                  Verarbeitungsschritte
-                </p>
-                {TOGGLE_OPTIONS.map(({ key, icon: Icon, label, desc }) => {
-                  const active = processingOptions[key];
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => toggleOption(key)}
-                      className={`toggle-row ${active ? "active" : ""}`}
-                    >
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "8px",
-                          background: active ? "var(--color-accent-muted)" : "var(--color-indigo-muted)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          transition: "background 0.2s",
-                        }}
-                      >
-                        <Icon size={15} color={active ? "var(--color-accent)" : "var(--color-foreground-subtle)"} />
-                      </div>
-                      <div className="flex flex-col" style={{ gap: "1px", flex: 1 }}>
-                        <span style={{
-                          fontSize: "13px",
-                          fontWeight: 600,
-                          color: active ? "var(--color-foreground)" : "var(--color-foreground-muted)",
-                        }}>
-                          {label}
-                        </span>
-                        <span style={{ fontSize: "12px", color: "var(--color-foreground-subtle)" }}>
-                          {desc}
-                        </span>
-                      </div>
-                      <div className={`toggle-track ${active ? "on" : ""}`}>
-                        <div className="toggle-thumb" />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {isPro && credits && !hasEnoughCredits(60) && (
-              <div
-                style={{
-                  padding: "12px 16px",
-                  background: "var(--color-warning-bg)",
-                  border: "1px solid rgba(251, 191, 36, 0.2)",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  color: "var(--color-warning)",
-                }}
-              >
-                Guthaben niedrig: {formatCredits(credits.credits_seconds)} verbleibend.
-              </div>
-            )}
-
-            <div className="flex items-center" style={{ gap: "16px" }}>
-              <button
-                className="btn btn-primary flex items-center"
-                style={{ padding: "14px 28px", fontSize: "13px", gap: "10px" }}
-                onClick={handleProcess}
-                disabled={isProcessing}
-              >
-                {isPro ? <Crown size={16} /> : <Sparkles size={16} />}
-                {isPro
-                  ? `Pro: Audio bereinigen (${selectedPreset})`
-                  : "Audio bereinigen"}
-                <ArrowRight size={15} />
-              </button>
+              <AudioPlayer
+                file={processedBlob}
+                label={`bereinigt_${originalFile?.name.replace(/\.[^/.]+$/, "")}.wav`}
+                isProcessed
+                onDownload={handleDownload}
+              />
 
               <button
                 className="btn btn-ghost"
-                style={{ padding: "10px 16px", fontSize: "13px" }}
+                style={{ padding: "12px 0", fontSize: "13px", alignSelf: "flex-start" }}
                 onClick={resetAll}
               >
-                Andere Datei
+                Weitere Datei bereinigen
               </button>
             </div>
-          </div>
-        )}
-
-        {/* ── Result ── */}
-        {processedBlob && (
-          <div className="flex flex-col animate-scale-in" style={{ width: "100%", gap: "24px" }}>
-            <div
-              className="flex items-center"
-              style={{
-                gap: "12px",
-                padding: "14px 18px",
-                background: "var(--color-success-bg)",
-                border: "1px solid rgba(74, 222, 128, 0.15)",
-                borderRadius: "12px",
-              }}
-            >
-              <div
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "50%",
-                  background: "rgba(74, 222, 128, 0.15)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <Check size={14} color="var(--color-success)" />
-              </div>
-              <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-success)" }}>
-                Audio erfolgreich bereinigt
-                {isPro && ` · Preset: ${selectedPreset}`}
-              </span>
-            </div>
-
-            <AudioPlayer
-              file={processedBlob}
-              label={`bereinigt_${originalFile?.name.replace(/\.[^/.]+$/, "")}.wav`}
-              isProcessed
-              onDownload={handleDownload}
-            />
-
-            <button
-              className="btn btn-ghost"
-              style={{ padding: "10px 0", fontSize: "13px", alignSelf: "flex-start" }}
-              onClick={resetAll}
-            >
-              Weitere Datei bereinigen
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <ProcessingModal

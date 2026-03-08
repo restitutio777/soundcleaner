@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Play, Pause, Volume2, Download, AudioLines } from "lucide-react";
 
 interface AudioPlayerProps {
@@ -21,6 +21,7 @@ export default function AudioPlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(80);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const waveformRef = useRef<HTMLDivElement>(null);
   const [audioUrl, setAudioUrl] = useState<string>("");
 
   useEffect(() => {
@@ -69,6 +70,15 @@ export default function AudioPlayer({
     }
   };
 
+  const handleWaveformClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!waveformRef.current || !audioRef.current || !duration) return;
+    const rect = waveformRef.current.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const newTime = pct * duration;
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  }, [duration]);
+
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
     setCurrentTime(time);
@@ -110,7 +120,10 @@ export default function AudioPlayer({
               width: "44px",
               height: "44px",
               borderRadius: "12px",
-              background: isProcessed ? "var(--color-accent-muted)" : "var(--color-indigo-muted)",
+              background: isProcessed
+                ? "linear-gradient(135deg, rgba(191, 111, 132, 0.18) 0%, rgba(191, 111, 132, 0.06) 100%)"
+                : "var(--color-indigo-muted)",
+              border: isProcessed ? "1px solid rgba(191, 111, 132, 0.12)" : "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -134,13 +147,7 @@ export default function AudioPlayer({
               {displayName}
             </h4>
             {fileSize && (
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "12px",
-                  color: "var(--color-foreground-subtle)",
-                }}
-              >
+              <p style={{ margin: 0, fontSize: "12px", color: "var(--color-foreground-subtle)" }}>
                 {fileSize}
               </p>
             )}
@@ -160,12 +167,15 @@ export default function AudioPlayer({
       </div>
 
       <div
+        ref={waveformRef}
         className="waveform-container"
         style={{
           height: "80px",
           marginBottom: "16px",
           padding: "16px 12px",
+          cursor: "pointer",
         }}
+        onClick={handleWaveformClick}
       >
         <div
           className="flex items-center justify-center"
@@ -178,7 +188,7 @@ export default function AudioPlayer({
               style={{
                 width: "100%",
                 height: `${bar.height}%`,
-                opacity: bar.isActive ? 1 : 0.25,
+                opacity: bar.isActive ? 1 : 0.2,
               }}
             />
           ))}
@@ -224,9 +234,9 @@ export default function AudioPlayer({
         <button
           className="btn btn-primary"
           style={{
-            width: "44px",
-            height: "44px",
-            borderRadius: "12px",
+            width: "46px",
+            height: "46px",
+            borderRadius: "13px",
             padding: 0,
           }}
           onClick={togglePlay}

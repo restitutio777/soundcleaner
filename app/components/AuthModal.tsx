@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Mail, Lock, Loader as Loader2 } from "lucide-react";
+import { X, Mail, Lock, Loader as Loader2, AudioLines } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 interface AuthModalProps {
@@ -57,21 +57,35 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
         style={{ width: "420px", padding: "36px" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Kopfzeile */}
         <div className="flex items-center justify-between" style={{ marginBottom: "28px" }}>
-          <div>
-            <h2
-              style={{
-                margin: 0,
-                fontFamily: "var(--font-display)",
-                fontSize: "24px",
-                fontWeight: 400,
-                color: "var(--color-foreground)",
-              }}
-            >
-              {mode === "login" ? "Anmelden" : "Konto erstellen"}
-            </h2>
-            <p style={{ margin: "4px 0 0", fontSize: "14px", color: "var(--color-foreground-subtle)" }}>
+          <div className="flex flex-col" style={{ gap: "6px" }}>
+            <div className="flex items-center" style={{ gap: "10px" }}>
+              <div
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "8px",
+                  background: "var(--color-accent-muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <AudioLines size={16} color="var(--color-accent)" />
+              </div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontFamily: "var(--font-display)",
+                  fontSize: "24px",
+                  fontWeight: 400,
+                  color: "var(--color-foreground)",
+                }}
+              >
+                {mode === "login" ? "Anmelden" : "Konto erstellen"}
+              </h2>
+            </div>
+            <p style={{ margin: 0, fontSize: "14px", color: "var(--color-foreground-subtle)" }}>
               {mode === "login"
                 ? "Willkommen zurück bei KlangRein"
                 : "10 Minuten Startguthaben kostenlos"}
@@ -79,14 +93,13 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
           </div>
           <button
             className="btn btn-ghost"
-            style={{ width: "36px", height: "36px", padding: 0 }}
+            style={{ width: "36px", height: "36px", padding: 0, borderRadius: "10px", alignSelf: "flex-start" }}
             onClick={onClose}
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Erfolgsmeldung */}
         {successMsg && (
           <div
             style={{
@@ -103,7 +116,6 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
           </div>
         )}
 
-        {/* Fehlermeldung */}
         {error && (
           <div
             style={{
@@ -120,7 +132,6 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
           </div>
         )}
 
-        {/* Formular */}
         <form onSubmit={handleSubmit} className="flex flex-col" style={{ gap: "16px" }}>
           <div className="flex flex-col" style={{ gap: "6px" }}>
             <label
@@ -128,13 +139,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
             >
               E-Mail
             </label>
-            <div className="flex items-center" style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "10px",
-              padding: "0 14px",
-              gap: "10px",
-            }}>
+            <div className="input-group">
               <Mail size={16} color="var(--color-foreground-subtle)" />
               <input
                 type="email"
@@ -142,16 +147,6 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="deine@email.de"
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  outline: "none",
-                  height: "44px",
-                  flex: 1,
-                  fontSize: "14px",
-                  color: "var(--color-foreground)",
-                  fontFamily: "var(--font-sans)",
-                }}
               />
             </div>
           </div>
@@ -162,13 +157,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
             >
               Passwort
             </label>
-            <div className="flex items-center" style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "10px",
-              padding: "0 14px",
-              gap: "10px",
-            }}>
+            <div className="input-group">
               <Lock size={16} color="var(--color-foreground-subtle)" />
               <input
                 type="password"
@@ -176,17 +165,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                placeholder={mode === "register" ? "Mindestens 6 Zeichen" : "••••••••"}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  outline: "none",
-                  height: "44px",
-                  flex: 1,
-                  fontSize: "14px",
-                  color: "var(--color-foreground)",
-                  fontFamily: "var(--font-sans)",
-                }}
+                placeholder={mode === "register" ? "Mindestens 6 Zeichen" : "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"}
               />
             </div>
           </div>
@@ -202,14 +181,20 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
           </button>
         </form>
 
-        {/* Umschalten zwischen Login und Registrierung */}
         <div style={{ textAlign: "center", marginTop: "20px" }}>
           <span style={{ fontSize: "14px", color: "var(--color-foreground-subtle)" }}>
             {mode === "login" ? "Noch kein Konto?" : "Bereits registriert?"}
           </span>{" "}
           <button
             className="btn btn-ghost"
-            style={{ padding: 0, fontSize: "14px", color: "var(--color-accent)", textDecoration: "underline" }}
+            style={{
+              padding: 0,
+              fontSize: "14px",
+              color: "var(--color-accent)",
+              textDecoration: "underline",
+              textTransform: "none",
+              letterSpacing: 0,
+            }}
             onClick={() => {
               setMode(mode === "login" ? "register" : "login");
               setError(null);
