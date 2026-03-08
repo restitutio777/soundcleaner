@@ -21,6 +21,7 @@ import Toast from "./components/Toast";
 import AuthModal from "./components/AuthModal";
 import CreditsPanel from "./components/CreditsPanel";
 import PresetSelector from "./components/PresetSelector";
+import UsageCounter from "./components/UsageCounter";
 import { useAuth } from "./context/AuthContext";
 import { useCredits } from "./hooks/useCredits";
 import {
@@ -31,7 +32,7 @@ import {
   type ProcessingStats,
   DEFAULT_PROCESSING_OPTIONS,
 } from "./lib/audioProcessor";
-import { FREE_MAX_DURATION_SECONDS, PRO_MAX_DURATION_SECONDS } from "./lib/supabaseClient";
+import { supabase, FREE_MAX_DURATION_SECONDS, PRO_MAX_DURATION_SECONDS } from "./lib/supabaseClient";
 
 function LogoMark() {
   return (
@@ -311,8 +312,10 @@ export default function Home() {
               setAuthModalMode("login");
               setAuthModalOpen(true);
             }}
-            onBuyCreditsClick={() => {
-              showToast("Stripe-Integration folgt in Kürze.", "success");
+            onBuyCreditsClick={(packageId: string) => {
+              if (user) {
+                supabase.from("purchase_interest").insert({ user_id: user.id, package_id: packageId });
+              }
             }}
           />
         </header>
@@ -673,6 +676,8 @@ export default function Home() {
         isVisible={toast.visible}
         onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
+
+      <UsageCounter />
     </div>
   );
 }

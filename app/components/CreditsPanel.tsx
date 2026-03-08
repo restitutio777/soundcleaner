@@ -1,20 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Coins, ChevronDown, ChevronUp, LogOut, User } from "lucide-react";
+import { Coins, ChevronDown, ChevronUp, LogOut, User, ArrowLeft, Check } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCredits } from "../hooks/useCredits";
 import { CREDIT_PACKAGES } from "../lib/supabaseClient";
 
+type ConfirmState = { packageId: string; label: string; display: string } | null;
+
 interface CreditsPanelProps {
   onLoginClick: () => void;
-  onBuyCreditsClick: () => void;
+  onBuyCreditsClick: (packageId: string) => void;
 }
 
 export default function CreditsPanel({ onLoginClick, onBuyCreditsClick }: CreditsPanelProps) {
   const { user, signOut } = useAuth();
   const { credits, formatCredits } = useCredits();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   // Prozentualer Anteil des Guthabens (max 10 Stunden als Referenz)
   const creditPercent = credits
@@ -49,7 +53,12 @@ export default function CreditsPanel({ onLoginClick, onBuyCreditsClick }: Credit
           cursor: "pointer",
           transition: "border-color 0.2s",
         }}
-        onClick={() => setMenuOpen((v) => !v)}
+        onClick={() => {
+          setMenuOpen((v) => {
+            if (v) { setConfirm(null); setSubmitted(false); }
+            return !v;
+          });
+        }}
       >
         {/* Guthaben-Anzeige */}
         <div className="flex items-center" style={{ gap: "8px" }}>
@@ -138,26 +147,73 @@ export default function CreditsPanel({ onLoginClick, onBuyCreditsClick }: Credit
 
           {/* Guthaben-Info */}
           <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--color-border)" }}>
-            <p style={{ margin: "0 0 10px", fontSize: "12px", color: "var(--color-foreground-subtle)", lineHeight: 1.6 }}>
-              Kaufe Credits, um längere oder professionelle Aufnahmen zu verarbeiten.
-              Dein Guthaben wird pro Minute verarbeitetem Audio abgezogen.
-            </p>
-            <div className="flex flex-col" style={{ gap: "6px" }}>
-              {CREDIT_PACKAGES.map((pkg) => (
-                <button
-                  key={pkg.id}
-                  className="btn btn-secondary flex items-center justify-between"
-                  style={{ padding: "8px 12px", width: "100%", fontSize: "12px" }}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onBuyCreditsClick();
+            {submitted ? (
+              <div className="flex flex-col items-center" style={{ gap: "10px", padding: "8px 0" }}>
+                <div
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "50%",
+                    background: "rgba(74, 222, 128, 0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  <span>{pkg.label}</span>
-                  <span style={{ fontWeight: 700, color: "var(--color-accent)" }}>{pkg.display}</span>
+                  <Check size={18} color="var(--color-success)" />
+                </div>
+                <p style={{ margin: 0, fontSize: "13px", color: "var(--color-foreground)", fontWeight: 600, textAlign: "center" }}>
+                  Danke!
+                </p>
+                <p style={{ margin: 0, fontSize: "12px", color: "var(--color-foreground-subtle)", lineHeight: 1.6, textAlign: "center" }}>
+                  Die Bezahlung wird in den naechsten Tagen freigeschaltet. Wir benachrichtigen dich per E-Mail.
+                </p>
+              </div>
+            ) : confirm ? (
+              <div className="flex flex-col" style={{ gap: "10px" }}>
+                <button
+                  className="btn btn-ghost flex items-center"
+                  style={{ padding: "2px 0", gap: "4px", fontSize: "12px", justifyContent: "flex-start", textTransform: "none", letterSpacing: 0 }}
+                  onClick={() => setConfirm(null)}
+                >
+                  <ArrowLeft size={13} />
+                  Zurueck
                 </button>
-              ))}
-            </div>
+                <p style={{ margin: 0, fontSize: "13px", color: "var(--color-foreground)", lineHeight: 1.6 }}>
+                  <strong>{confirm.label}</strong> fuer <strong>{confirm.display}</strong> kaufen?
+                </p>
+                <button
+                  className="btn btn-primary"
+                  style={{ width: "100%", padding: "10px 16px", fontSize: "13px" }}
+                  onClick={() => {
+                    onBuyCreditsClick(confirm.packageId);
+                    setSubmitted(true);
+                  }}
+                >
+                  Ja, ich will kaufen
+                </button>
+              </div>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 10px", fontSize: "12px", color: "var(--color-foreground-subtle)", lineHeight: 1.6 }}>
+                  Kaufe Credits, um laengere oder professionelle Aufnahmen zu verarbeiten.
+                  Dein Guthaben wird pro Minute verarbeitetem Audio abgezogen.
+                </p>
+                <div className="flex flex-col" style={{ gap: "6px" }}>
+                  {CREDIT_PACKAGES.map((pkg) => (
+                    <button
+                      key={pkg.id}
+                      className="btn btn-secondary flex items-center justify-between"
+                      style={{ padding: "8px 12px", width: "100%", fontSize: "12px" }}
+                      onClick={() => setConfirm({ packageId: pkg.id, label: pkg.label, display: pkg.display })}
+                    >
+                      <span>{pkg.label}</span>
+                      <span style={{ fontWeight: 700, color: "var(--color-accent)" }}>{pkg.display}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Abmelden */}
