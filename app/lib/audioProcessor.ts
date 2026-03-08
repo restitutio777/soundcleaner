@@ -1,14 +1,3 @@
-/*
- * audioProcessor.ts — KlangRein
- *
- * Modular audio pipeline: decode → silenceTrim → highPass → peakNormalize
- *                         → lightCompression → lightDereverb → encodeWav
- *
- * Each step is optional via ProcessingOptions flags.
- * Only one AudioContext is created per processAudio call (during decode).
- * All heavy loops yield to the event loop every YIELD_EVERY samples.
- */
-
 export type ProcessingPreset = "basic" | "kursaufnahme" | "webinar" | "podcast";
 
 export interface ProcessingOptions {
@@ -42,26 +31,21 @@ export interface ProcessingStats {
   silenceRegionsFound: number;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
 const YIELD_EVERY = 88200;
 
 const SILENCE_THRESHOLD_RMS = 0.018;
 const SILENCE_MIN_DURATION  = 0.5;
 const KEEP_PAUSE_DURATION   = 0.25;
 
-// Podcast-style compressor settings
-const COMP_THRESHOLD_DB = -14;
-const COMP_RATIO        = 2.0;
-const COMP_KNEE_DB      = 6;
-const COMP_ATTACK_MS    = 15;
-const COMP_RELEASE_MS   = 120;
-const COMP_FLOOR_DB     = -35;
+const COMP_THRESHOLD_DB = -22;
+const COMP_RATIO        = 3.0;
+const COMP_KNEE_DB      = 8;
+const COMP_ATTACK_MS    = 10;
+const COMP_RELEASE_MS   = 150;
+const COMP_FLOOR_DB     = -50;
+const COMP_MAKEUP_DB    = 6;
 
-// Peak normalization target: -1 dBFS
-const PEAK_TARGET_DB = -1.0;
-
-// ── Utilities ─────────────────────────────────────────────────────────────────
+const LUFS_TARGET = -16;
 
 function yieldToMain(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -109,8 +93,6 @@ function truePeakDb(buffer: AudioBuffer): number {
   return peak < 1e-10 ? -120 : 20 * Math.log10(peak);
 }
 
-// ── Step 1: Decode ────────────────────────────────────────────────────────────
-
 async function decodeAudio(
   file: File,
   onProgress: ProgressCallback,
@@ -129,8 +111,6 @@ async function decodeAudio(
     await ctx.close();
   }
 }
-
-// ── Step 2: Silence trim ──────────────────────────────────────────────────────
 
 async function detectSilenceRegions(
   buffer: AudioBuffer,
@@ -283,10 +263,6 @@ async function trimSilenceRegions(
   return out;
 }
 
-// ── Step 3: High-pass filter (80 Hz) ─────────────────────────────────────────
-// Uses OfflineAudioContext with a Web Audio BiquadFilter.
-// No AudioContext stored globally — OfflineAudioContext is a one-shot renderer.
-
 async function applyHighPass(
   buffer: AudioBuffer,
   onProgress: ProgressCallback,
@@ -306,11 +282,17 @@ async function applyHighPass(
 
   const hp = ctx.createBiquadFilter();
   hp.type = "highpass";
-  hp.frequency.value = 80;
-  hp.Q.value = 0.7;
+  hp.frequency.value = 100;
+  hp.Q.value = 0.71;
+
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 8000;
+  lp.Q.value = 0.71;
 
   src.connect(hp);
-  hp.connect(ctx.destination);
+  hp.connect(lp);
+  lp.connect(ctx.destination);
   src.start(0);
 
   const result = await ctx.startRendering();
@@ -318,57 +300,161 @@ async function applyHighPass(
   return result;
 }
 
-// ── Step 4: Peak normalization to -1 dBFS ────────────────────────────────────
-// Scans true peak across all channels, computes exact gain to reach -1 dBFS.
-
-async function applyPeakNormalize(
+async function applyNoiseReduction(
   buffer: AudioBuffer,
   onProgress: ProgressCallback,
   pctStart: number,
   pctEnd: number
-): Promise<{ buffer: AudioBuffer; gainDb: number }> {
-  onProgress({ step: "Lautstärke ausgleichen", percent: pctStart });
+): Promise<AudioBuffer> {
+  onProgress({ step: "Hintergrundgeräusche reduzieren", percent: pctStart });
 
-  const currentPeakDb = truePeakDb(buffer);
-  if (currentPeakDb <= -119) {
-    onProgress({ step: "Lautstärke ausgleichen", percent: pctEnd });
-    return { buffer, gainDb: 0 };
+  const sr = buffer.sampleRate;
+  const nch = buffer.numberOfChannels;
+  const N = 2048;
+  const HOP = 512;
+  const BINS = N / 2 + 1;
+  const NOISE_LEARN_FRAMES = Math.ceil((0.5 * sr) / HOP);
+  const GATE_STRENGTH = 0.85;
+  const SPECTRAL_FLOOR = 0.08;
+  const SMOOTHING = 0.92;
+
+  const hann = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)));
   }
 
-  const gainDb = PEAK_TARGET_DB - currentPeakDb;
-  const linearGain = Math.pow(10, gainDb / 20);
+  const fftRe = new Float64Array(N);
+  const fftIm = new Float64Array(N);
 
-  const nch = buffer.numberOfChannels;
-  const out = makeBuffer(nch, buffer.length, buffer.sampleRate);
-  const totalSamples = nch * buffer.length;
-  let written = 0;
-  const pctRange = pctEnd - pctStart;
+  const bitRev = new Uint32Array(N);
+  {
+    const bits = Math.log2(N);
+    for (let i = 0; i < N; i++) {
+      let x = i, r = 0;
+      for (let b = 0; b < bits; b++) { r = (r << 1) | (x & 1); x >>= 1; }
+      bitRev[i] = r;
+    }
+  }
 
-  for (let ch = 0; ch < nch; ch++) {
-    const src = buffer.getChannelData(ch);
-    const dst = out.getChannelData(ch);
-    for (let i = 0; i < src.length; i++) {
-      dst[i] = Math.max(-0.9999, Math.min(0.9999, src[i] * linearGain));
-      if (++written % YIELD_EVERY === 0) {
-        onProgress({
-          step: "Lautstärke ausgleichen",
-          percent: pctStart + Math.round((written / totalSamples) * pctRange),
-        });
-        await yieldToMain();
+  const twRe = new Float64Array(N / 2);
+  const twIm = new Float64Array(N / 2);
+  for (let i = 0; i < N / 2; i++) {
+    const angle = (-2 * Math.PI * i) / N;
+    twRe[i] = Math.cos(angle);
+    twIm[i] = Math.sin(angle);
+  }
+
+  function fftInPlace(sign: 1 | -1): void {
+    for (let i = 0; i < N; i++) {
+      const j = bitRev[i];
+      if (j > i) {
+        let t = fftRe[i]; fftRe[i] = fftRe[j]; fftRe[j] = t;
+        t = fftIm[i]; fftIm[i] = fftIm[j]; fftIm[j] = t;
+      }
+    }
+    for (let len = 2; len <= N; len <<= 1) {
+      const half = len >> 1;
+      const step = N / len;
+      for (let i = 0; i < N; i += len) {
+        for (let j = 0; j < half; j++) {
+          const ti = step * j;
+          const wr = twRe[ti];
+          const wi = sign === 1 ? -twIm[ti] : twIm[ti];
+          const ur = fftRe[i + j], ui = fftIm[i + j];
+          const vr = fftRe[i + j + half] * wr - fftIm[i + j + half] * wi;
+          const vi = fftRe[i + j + half] * wi + fftIm[i + j + half] * wr;
+          fftRe[i + j]        = ur + vr;
+          fftIm[i + j]        = ui + vi;
+          fftRe[i + j + half] = ur - vr;
+          fftIm[i + j + half] = ui - vi;
+        }
       }
     }
   }
 
-  onProgress({ step: "Lautstärke ausgleichen", percent: pctEnd });
-  return { buffer: out, gainDb };
+  const pctRange = pctEnd - pctStart;
+  const out = makeBuffer(nch, buffer.length, sr);
+
+  for (let ch = 0; ch < nch; ch++) {
+    const src = buffer.getChannelData(ch);
+    const dst = out.getChannelData(ch);
+    const ola = new Float32Array(src.length + N);
+    const olaW = new Float32Array(src.length + N);
+    const noiseProfile = new Float32Array(BINS);
+    const smoothedGain = new Float32Array(BINS).fill(1.0);
+    const frame = new Float32Array(N);
+    const outFr = new Float32Array(N);
+    const mag = new Float32Array(BINS);
+    let frameCount = 0;
+
+    for (let pos = 0; pos < src.length; pos += HOP) {
+      for (let i = 0; i < N; i++) {
+        const idx = pos + i;
+        frame[i] = idx < src.length ? src[idx] * hann[i] : 0;
+      }
+
+      for (let i = 0; i < N; i++) { fftRe[i] = frame[i]; fftIm[i] = 0; }
+      fftInPlace(1);
+
+      for (let k = 0; k < BINS; k++) {
+        mag[k] = Math.sqrt(fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k]);
+      }
+
+      if (frameCount < NOISE_LEARN_FRAMES) {
+        for (let k = 0; k < BINS; k++) {
+          noiseProfile[k] += mag[k] / NOISE_LEARN_FRAMES;
+        }
+      }
+
+      if (frameCount >= NOISE_LEARN_FRAMES) {
+        for (let k = 0; k < BINS; k++) {
+          const snr = mag[k] / (noiseProfile[k] + 1e-10);
+          let gain = 1.0;
+          if (snr < 2.0) {
+            gain = Math.max(SPECTRAL_FLOOR, 1.0 - GATE_STRENGTH * (1.0 - snr / 2.0));
+          }
+          smoothedGain[k] = SMOOTHING * smoothedGain[k] + (1 - SMOOTHING) * gain;
+
+          fftRe[k] *= smoothedGain[k];
+          fftIm[k] *= smoothedGain[k];
+          if (k > 0 && k < N - k) {
+            fftRe[N - k] = fftRe[k];
+            fftIm[N - k] = -fftIm[k];
+          }
+        }
+      }
+
+      fftInPlace(-1);
+      const invN = 1 / N;
+      for (let i = 0; i < N; i++) outFr[i] = fftRe[i] * invN;
+
+      for (let i = 0; i < N; i++) {
+        ola[pos + i] += outFr[i] * hann[i];
+        olaW[pos + i] += hann[i] * hann[i];
+      }
+
+      frameCount++;
+      if ((frameCount * HOP) % YIELD_EVERY < HOP) {
+        onProgress({
+          step: "Hintergrundgeräusche reduzieren",
+          percent: pctStart + Math.round(
+            Math.min((ch * src.length + pos) / (nch * src.length), 1) * pctRange
+          ),
+        });
+        await yieldToMain();
+      }
+    }
+
+    for (let i = 0; i < src.length; i++) {
+      dst[i] = olaW[i] > 1e-8 ? ola[i] / olaW[i] : 0;
+    }
+  }
+
+  onProgress({ step: "Hintergrundgeräusche reduzieren", percent: pctEnd });
+  return out;
 }
 
-// ── Step 5: Light compression (podcast-style) ─────────────────────────────────
-// Gentle feed-forward compressor:
-//   threshold -14 dB, ratio 2:1, attack 15ms, release 120ms, knee 6 dB.
-// Signals below COMP_FLOOR_DB (breaths/room noise) are left untouched.
-
-async function applyLightCompression(
+async function applyCompression(
   buffer: AudioBuffer,
   onProgress: ProgressCallback,
   pctStart: number,
@@ -382,6 +468,7 @@ async function applyLightCompression(
   const kneeBottom = COMP_THRESHOLD_DB - COMP_KNEE_DB / 2;
   const kneeTop    = COMP_THRESHOLD_DB + COMP_KNEE_DB / 2;
   const floorLin   = Math.pow(10, COMP_FLOOR_DB / 20);
+  const makeupLin  = Math.pow(10, COMP_MAKEUP_DB / 20);
   const TINY = 1e-10;
 
   const nch = buffer.numberOfChannels;
@@ -404,9 +491,8 @@ async function applyLightCompression(
         envLin = relCoeff * envLin + (1 - relCoeff) * absLin;
       }
 
-      // Skip compression for very quiet signals (preserve breaths)
       if (envLin < floorLin) {
-        dst[i] = src[i];
+        dst[i] = src[i] * makeupLin;
       } else {
         const envDb = 20 * Math.log10(Math.max(envLin, TINY));
 
@@ -418,7 +504,7 @@ async function applyLightCompression(
           grDb = (COMP_THRESHOLD_DB - envDb) * (1 - 1 / COMP_RATIO) * (t * t);
         }
 
-        dst[i] = src[i] * Math.pow(10, grDb / 20);
+        dst[i] = src[i] * Math.pow(10, grDb / 20) * makeupLin;
       }
 
       if (++worked % YIELD_EVERY === 0) {
@@ -431,7 +517,6 @@ async function applyLightCompression(
     }
   }
 
-  // Safety limiter: clamp any samples that exceed ±1
   for (let ch = 0; ch < nch; ch++) {
     const dst = out.getChannelData(ch);
     for (let i = 0; i < dst.length; i++) {
@@ -444,17 +529,7 @@ async function applyLightCompression(
   return out;
 }
 
-// ── Step 6: Light dereverberation ────────────────────────────────────────────
-//
-// STFT-domain spectral subtraction at very conservative strength (α=0.15).
-// Estimates the slowly-decaying reverb tail via an IIR floor tracker tuned
-// to τ=120ms and subtracts only 15% of that estimate — just enough to reduce
-// audible room reflections without producing musical-noise artifacts.
-//
-// Phase is preserved throughout (only magnitude is scaled).
-// Uses a radix-2 FFT — O(N log N), viable for 3–5 min files.
-
-async function applyLightDereverb(
+async function applyDereverb(
   buffer: AudioBuffer,
   onProgress: ProgressCallback,
   pctStart: number,
@@ -464,29 +539,26 @@ async function applyLightDereverb(
 
   const sr   = buffer.sampleRate;
   const nch  = buffer.numberOfChannels;
-  const N    = 1024;
-  const HOP  = 256;
+  const N    = 2048;
+  const HOP  = 512;
 
-  // Conservative settings — reflection reduction only
-  const ALPHA = 0.15;  // subtraction strength (was 0.70)
-  const BETA  = 0.02;  // spectral floor factor
+  const ALPHA = 0.40;
+  const BETA  = 0.06;
 
-  const TAU_SAMPLES = sr * 0.12;
+  const TAU_SAMPLES = sr * 0.20;
   const decayCoeff  = Math.exp(-HOP / TAU_SAMPLES);
 
-  // Hann window
+  const BINS  = N / 2 + 1;
+
   const hann = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)));
   }
 
-  // FFT setup — radix-2 Cooley–Tukey
-  const BINS  = N / 2 + 1;
   const fftRe = new Float64Array(N);
   const fftIm = new Float64Array(N);
   const mag   = new Float32Array(BINS);
 
-  // Bit-reversal table
   const bitRev = new Uint32Array(N);
   {
     const bits = Math.log2(N);
@@ -497,7 +569,6 @@ async function applyLightDereverb(
     }
   }
 
-  // Twiddle-factor cache
   const twRe = new Float64Array(N / 2);
   const twIm = new Float64Array(N / 2);
   for (let i = 0; i < N / 2; i++) {
@@ -557,6 +628,7 @@ async function applyLightDereverb(
     const ola   = new Float32Array(src.length + N);
     const olaW  = new Float32Array(src.length + N);
     const floor = new Float32Array(BINS);
+    const prevGain = new Float32Array(BINS).fill(1.0);
     const frame = new Float32Array(N);
     const outFr = new Float32Array(N);
     let worked  = 0;
@@ -572,9 +644,11 @@ async function applyLightDereverb(
       for (let k = 0; k < BINS; k++) {
         floor[k] = decayCoeff * floor[k] + (1 - decayCoeff) * mag[k];
         const reduced = Math.max(mag[k] - ALPHA * floor[k], BETA * mag[k]);
-        const scale   = mag[k] > 1e-10 ? reduced / mag[k] : 0;
-        fftRe[k] *= scale;
-        fftIm[k] *= scale;
+        let gain = mag[k] > 1e-10 ? reduced / mag[k] : 0;
+        gain = 0.7 * prevGain[k] + 0.3 * gain;
+        prevGain[k] = gain;
+        fftRe[k] *= gain;
+        fftIm[k] *= gain;
         if (k > 0 && k < N - k) {
           fftRe[N - k] = fftRe[k];
           fftIm[N - k] = -fftIm[k];
@@ -609,7 +683,122 @@ async function applyLightDereverb(
   return out;
 }
 
-// ── WAV Export ────────────────────────────────────────────────────────────────
+async function applyLoudnessNormalize(
+  buffer: AudioBuffer,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
+): Promise<{ buffer: AudioBuffer; gainDb: number }> {
+  onProgress({ step: "Lautstärke normalisieren", percent: pctStart });
+
+  const currentRmsDb = measureRmsDb(buffer);
+  if (currentRmsDb <= -60) {
+    onProgress({ step: "Lautstärke normalisieren", percent: pctEnd });
+    return { buffer, gainDb: 0 };
+  }
+
+  let gainDb = LUFS_TARGET - currentRmsDb;
+  const currentPeakDb = truePeakDb(buffer);
+  const maxGainDb = -1.0 - currentPeakDb;
+  if (gainDb > maxGainDb) gainDb = maxGainDb;
+  if (gainDb < -20) gainDb = -20;
+
+  const linearGain = Math.pow(10, gainDb / 20);
+
+  const nch = buffer.numberOfChannels;
+  const out = makeBuffer(nch, buffer.length, buffer.sampleRate);
+  const totalSamples = nch * buffer.length;
+  let written = 0;
+  const pctRange = pctEnd - pctStart;
+
+  for (let ch = 0; ch < nch; ch++) {
+    const src = buffer.getChannelData(ch);
+    const dst = out.getChannelData(ch);
+    for (let i = 0; i < src.length; i++) {
+      dst[i] = Math.max(-0.9999, Math.min(0.9999, src[i] * linearGain));
+      if (++written % YIELD_EVERY === 0) {
+        onProgress({
+          step: "Lautstärke normalisieren",
+          percent: pctStart + Math.round((written / totalSamples) * pctRange),
+        });
+        await yieldToMain();
+      }
+    }
+  }
+
+  onProgress({ step: "Lautstärke normalisieren", percent: pctEnd });
+  return { buffer: out, gainDb };
+}
+
+async function applyLimiter(
+  buffer: AudioBuffer,
+  onProgress: ProgressCallback,
+  pctStart: number,
+  pctEnd: number
+): Promise<AudioBuffer> {
+  onProgress({ step: "Limiter anwenden", percent: pctStart });
+
+  const sr = buffer.sampleRate;
+  const nch = buffer.numberOfChannels;
+  const ceilingLin = Math.pow(10, -1.0 / 20);
+  const lookAhead = Math.floor(sr * 0.005);
+  const releaseCoeff = Math.exp(-1 / (sr * 0.050));
+
+  const out = makeBuffer(nch, buffer.length, sr);
+
+  const peakEnv = new Float32Array(buffer.length);
+
+  for (let ch = 0; ch < nch; ch++) {
+    const src = buffer.getChannelData(ch);
+    for (let i = 0; i < src.length; i++) {
+      const a = Math.abs(src[i]);
+      if (a > peakEnv[i]) peakEnv[i] = a;
+    }
+  }
+
+  const gainCurve = new Float32Array(buffer.length).fill(1.0);
+  for (let i = 0; i < buffer.length; i++) {
+    if (peakEnv[i] > ceilingLin) {
+      const neededGain = ceilingLin / peakEnv[i];
+      const applyAt = Math.max(0, i - lookAhead);
+      for (let j = applyAt; j <= i; j++) {
+        if (neededGain < gainCurve[j]) gainCurve[j] = neededGain;
+      }
+    }
+  }
+
+  let smoothed = 1.0;
+  for (let i = 0; i < buffer.length; i++) {
+    if (gainCurve[i] < smoothed) {
+      smoothed = gainCurve[i];
+    } else {
+      smoothed = releaseCoeff * smoothed + (1 - releaseCoeff) * gainCurve[i];
+    }
+    gainCurve[i] = smoothed;
+  }
+
+  const totalWork = nch * buffer.length;
+  let worked = 0;
+  const pctRange = pctEnd - pctStart;
+
+  for (let ch = 0; ch < nch; ch++) {
+    const src = buffer.getChannelData(ch);
+    const dst = out.getChannelData(ch);
+    for (let i = 0; i < src.length; i++) {
+      dst[i] = src[i] * gainCurve[i];
+      if (++worked % YIELD_EVERY === 0) {
+        onProgress({
+          step: "Limiter anwenden",
+          percent: pctStart + Math.round((worked / totalWork) * pctRange),
+        });
+        await yieldToMain();
+      }
+    }
+  }
+
+  onProgress({ step: "Limiter anwenden", percent: pctEnd });
+  return out;
+}
 
 function audioBufferToWav(
   buffer: AudioBuffer,
@@ -660,48 +849,48 @@ function audioBufferToWav(
   return new Blob([ab], { type: "audio/wav" });
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-//
-// Progress allocation distributes percentages based on enabled steps.
-// Decode (0→10) and WAV encode (last 6%) are always present.
-// Remaining 84% is divided evenly among enabled middle steps.
-
 export async function processAudio(
   file: File,
   options: ProcessingOptions,
   onProgress: ProgressCallback
 ): Promise<{ blob: Blob; stats: ProcessingStats }> {
 
-  // Build ordered middle steps from enabled options
   type MiddleStep = {
-    id: keyof ProcessingOptions;
+    id: string;
     run: (buf: AudioBuffer, start: number, end: number) => Promise<AudioBuffer | { buffer: AudioBuffer; gainDb: number }>;
   };
 
   const middleSteps: MiddleStep[] = [];
+
   if (options.trimSilence) {
     middleSteps.push({ id: "trimSilence", run: async (buf, s, e) => {
       const regions = await detectSilenceRegions(buf, onProgress, s, s + (e - s) * 0.5);
-      const trimmed = await trimSilenceRegions(buf, regions, onProgress, s + (e - s) * 0.5, e);
-      return trimmed;
+      return await trimSilenceRegions(buf, regions, onProgress, s + (e - s) * 0.5, e);
     }});
   }
+
   if (options.highPass) {
     middleSteps.push({ id: "highPass", run: (buf, s, e) => applyHighPass(buf, onProgress, s, e) });
   }
-  if (options.normalize) {
-    middleSteps.push({ id: "normalize", run: (buf, s, e) => applyPeakNormalize(buf, onProgress, s, e) });
-  }
+
+  middleSteps.push({ id: "noiseReduce", run: (buf, s, e) => applyNoiseReduction(buf, onProgress, s, e) });
+
   if (options.compress) {
-    middleSteps.push({ id: "compress", run: (buf, s, e) => applyLightCompression(buf, onProgress, s, e) });
-  }
-  if (options.dereverb) {
-    middleSteps.push({ id: "dereverb", run: (buf, s, e) => applyLightDereverb(buf, onProgress, s, e) });
+    middleSteps.push({ id: "compress", run: (buf, s, e) => applyCompression(buf, onProgress, s, e) });
   }
 
-  // Allocate percentages
-  const DECODE_END = 10;
-  const ENCODE_RANGE = 6;
+  if (options.dereverb) {
+    middleSteps.push({ id: "dereverb", run: (buf, s, e) => applyDereverb(buf, onProgress, s, e) });
+  }
+
+  if (options.normalize) {
+    middleSteps.push({ id: "normalize", run: (buf, s, e) => applyLoudnessNormalize(buf, onProgress, s, e) });
+  }
+
+  middleSteps.push({ id: "limiter", run: (buf, s, e) => applyLimiter(buf, onProgress, s, e) });
+
+  const DECODE_END = 8;
+  const ENCODE_RANGE = 4;
   const ENCODE_START = 100 - ENCODE_RANGE;
   const MIDDLE_TOTAL = ENCODE_START - DECODE_END;
   const perStep = middleSteps.length > 0 ? MIDDLE_TOTAL / middleSteps.length : 0;
@@ -712,14 +901,13 @@ export async function processAudio(
 
   let current: AudioBuffer = original;
   let gainDb = 0;
-  let silenceRegionsFound = 0;
 
   for (let i = 0; i < middleSteps.length; i++) {
     const pctStart = DECODE_END + i * perStep;
     const pctEnd   = DECODE_END + (i + 1) * perStep;
     const result = await middleSteps[i].run(current, pctStart, pctEnd);
 
-    if ("buffer" in result && "gainDb" in result) {
+    if (result && typeof result === "object" && "buffer" in result && "gainDb" in result) {
       gainDb = result.gainDb;
       current = result.buffer;
     } else {
@@ -727,8 +915,6 @@ export async function processAudio(
     }
   }
 
-  // Recover silence region count if trim was enabled (detect already ran above)
-  // We approximate from the duration difference for stats display
   const blob = audioBufferToWav(current, onProgress, ENCODE_START, 100);
 
   return {
@@ -738,12 +924,11 @@ export async function processAudio(
       processedDuration: current.duration,
       gainAppliedDb: gainDb,
       estimatedLufs,
-      silenceRegionsFound,
+      silenceRegionsFound: 0,
     },
   };
 }
 
-// Legacy wrappers kept for compatibility with Pro pipeline
 export async function processAudioBasic(
   file: File,
   onProgress: ProgressCallback
