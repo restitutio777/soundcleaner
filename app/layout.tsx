@@ -42,6 +42,7 @@ export default function RootLayout({
     <html lang="de">
       <head>
         <meta name="theme-color" content="#BF6F84" />
+        <meta name="google-site-verification" content="IB-b4vCzD_1zeuIXlHIvn5W4e3s0raaMAcIPbpmeeJA" />
       </head>
       <body className={`${dmSerifDisplay.variable} ${dmSans.variable}`}>
         <AuthProvider>
