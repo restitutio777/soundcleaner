@@ -337,9 +337,9 @@ export default function Home() {
                     letterSpacing: "-0.02em",
                   }}
                 >
-                  Dein Audio.
+                  MP3 lauter machen.
                   <br />
-                  <span style={{ color: "var(--color-accent)" }}>Kristallklar.</span>
+                  <span style={{ color: "var(--color-accent)" }}>In Sekunden.</span>
                 </h1>
                 <p
                   className="animate-slide-up"
@@ -352,8 +352,8 @@ export default function Home() {
                     animationDelay: "0.06s",
                   }}
                 >
-                  Upload deine Aufnahme, wir schneiden Pausen und optimieren
-                  die Lautstärke. Fertige Datei herunterladen.
+                  Lautstärke erhöhen, Rauschen entfernen, Pausen kürzen –
+                  direkt im Browser. Kostenlos, ohne Anmeldung.
                 </p>
               </div>
 

@@ -18,9 +18,9 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "KlangRein — KI-gesteuerte Audio-Verbesserung",
+  title: "MP3 lauter machen & Audio bereinigen – KlangRein",
   description:
-    "Entferne Hintergrundgeräusche, Füllwörter und verbessere deine Audioqualität sofort mit KI.",
+    "Audio lauter machen, Hintergrundgeräusche entfernen und Lautstärke anpassen – kostenlos im Browser. Kein Download nötig. Für MP3, WAV, M4A und FLAC.",
   manifest: "/manifest.json",
   icons: {
     icon: "/icon.svg",
